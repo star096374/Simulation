@@ -1,0 +1,8 @@
+{
+  "name": "Simulation",
+  "version": "0.0.1",
+  "description": "Lukenet Simulation",
+  "dependencies": {
+    "async": "^2.6.1"
+  }
+}
