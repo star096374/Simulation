@@ -3,25 +3,32 @@
 const net = require('net');
 
 function Node(options) {
-  var self = this;
   if (options.id !== undefined) {
     this.id = options.id;
   }
+  else {
+    console.error("Node id is undefined");
+    return;
+  }
+
   if (options.port !== undefined && options.host !== undefined) {
     this.port = options.port;
     this.host = options.host;
   }
   else {
-    console.error("[%s] Server port or host is undefined.", this.id);
+    console.error("[%s] Server port or host is undefined", this.id);
     return;
   }
 
+  var self = this;
+  // the socket connect to another server, i.e. you are the client
+  this.socketClient = [];
   // the socket connected to the server, i.e. you are the server
   this.socketServer = [];
 
   this.server = net.createServer(function(socket) {
     // If someone connect to this server, this function will be triggered.
-    console.log('[%s] A client %s:%d connect to the server',self.id, socket.remoteAddress, socket.remotePort);
+    console.log("[%s] A client %s:%d connect to the server", self.id, socket.remoteAddress, socket.remotePort);
 
     // Defined the action when the event happen.
     socket.on('data', function(data) {
@@ -37,11 +44,11 @@ function Node(options) {
         }
         if (isJson == true) {
           if (message.receiver == self.id) {
-            console.log('[%s] -----Message Received-----', self.id);
-            console.log('[%s] Sender: %s', self.id, message.sender);
-            console.log('[%s] Receiver: %s', self.id, message.receiver);
-            console.log('[%s] Payload: %s', self.id, message.payload);
-            console.log('[%s] -----Message End-----', self.id);
+            console.log("[%s] -----Message Received-----", self.id);
+            console.log("[%s] Sender: %s", self.id, message.sender);
+            console.log("[%s] Receiver: %s", self.id, message.receiver);
+            console.log("[%s] Payload: %s", sel.f.id, message.payload);
+            console.log("[%s] -----Message End-----", self.id);
           }
           else {
             // check the number of exit relay nodes
@@ -59,16 +66,16 @@ function Node(options) {
               }
             });
             if (exitRelayNumber > 0) {
-              console.log('[%s] Forward message to exit relay nodes', self.id);
+              console.log("[%s] Forward message to exit relay nodes", self.id);
               self.sendMessageToExitRelayNodes(element);
             }
             else if (gatewayNumber > 0) {
-              console.log('[%s] Forward message to gateway', self.id);
+              console.log("[%s] Forward message to gateway", self.id);
               self.sendMessageToGateway(element);
             }
             else {
-              console.log('[%s] Forward message to the entry relay node', self.id);
-              self.sendMessageToReceiver(element);
+              console.log("[%s] Forward message to the entry relay node", self.id);
+              self.sendMessageToEntryRelayNodes(element);
             }
           }
         }
@@ -83,12 +90,14 @@ function Node(options) {
     });
   });
   this.server.listen(this.port, this.host);
-
-  // the socket connect to another server, i.e. you are the client
-  this.socketClient = [];
 }
 
 Node.prototype.connectToAnotherServer = function(type, host, port) {
+  if (type !== 'Exit Relay' && type !== 'Gateway' && type !== 'Entry Relay') {
+    console.error("[%s] connectToAnotherServer: Invalid Type", this.id);
+    return;
+  }
+
   var self = this;
   var socket = new net.Socket();
   this.socketClient.push({
@@ -97,21 +106,21 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
     socket: socket
   });
   socket.connect(port, host, function() {
-    console.log('[%s] Connected to ' + host + ':' + port, self.id);
+    console.log("[%s] Connected to %s:%d", self.id, host, port);
     socket.write(type + '\n');
   });
   socket.on('data', function(data) {
     var message = JSON.parse(data.toString());
     if (message.receiver == self.id) {
-      console.log('[%s] -----Message Received-----', self.id);
-      console.log('[%s] Sender: %s', self.id, message.sender);
-      console.log('[%s] Receiver: %s', self.id, message.receiver);
-      console.log('[%s] Payload: %s', self.id, message.payload);
-      console.log('[%s] -----Message End-----', self.id);
+      console.log("[%s] -----Message Received-----", self.id);
+      console.log("[%s] Sender: %s", self.id, message.sender);
+      console.log("[%s] Receiver: %s", self.id, message.receiver);
+      console.log("[%s] Payload: %s", self.id, message.payload);
+      console.log("[%s] -----Message End-----", self.id);
     }
     else {
-      console.log('[%s] Forward message to the entry relay node', self.id);
-      self.sendMessageToReceiver(data);      
+      console.log("[%s] Forward message to the entry relay node", self.id);
+      self.sendMessageToEntryRelayNodes(data);
     }
   });
   socket.on('close', function() {
@@ -119,20 +128,35 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
       return t.socket;
     }).indexOf(socket);
     self.socketClient.splice(index, 1);
-    console.log('[%s] Connection closed-' + socket.remoteAddress + ':' + socket.remotePort, self.id);
+    console.log("[%s] Connection %s:%d is closed", self.id, socket.remoteAddress, socket.remotePort);
   });
 };
 
-Node.prototype._sendMessageToClient = function(host, port, message) {
+Node.prototype._sendMessage = function(type, host, port, message) {
+  var socketsList;
+  var errorMessage;
+  switch (type) {
+    case 'client':
+      socketsList = this.socketClient;
+      errorMessage = "[" + this.id + "] You didn't connect to the server";
+      break;
+    case 'server':
+      socketsList = this.socketServer;
+      errorMessage = "[" + this.id + "] The client didn't connect to you";
+      break;
+    default:
+      console.error("_sendMessage: Invalid Type");
+      return;
+  }
   var socket;
-  var index = this.socketClient.map(function(t) {
+  var index = socketsList.map(function(t) {
     return t.address;
   }).indexOf(host + ':' + port);
   if (index == -1) {
-    console.error("[%s] You didn't connect to the server.", this.id);
+    console.error(errorMessage);
     return;
   }
-  socket = this.socketClient[index].socket;
+  socket = socketsList[index].socket;
   socket.write(message + '\n');
 }
 
@@ -143,7 +167,7 @@ Node.prototype.sendMessageToExitRelayNodes = function(message) {
       var result = element.address.split(':');
       var host = result[0];
       var port = result[1];
-      self._sendMessageToClient(host, port, message);
+      self._sendMessage('client', host, port, message);
     }
   });
 }
@@ -155,32 +179,19 @@ Node.prototype.sendMessageToGateway = function(message) {
       var result = element.address.split(':');
       var host = result[0];
       var port = result[1];
-      self._sendMessageToClient(host, port, message);
+      self._sendMessage('client', host, port, message);
     }
   });
 }
 
-Node.prototype._sendMessageToServer = function(host, port, message) {
-  var socket;
-  var index = this.socketServer.map(function(t) {
-    return t.address;
-  }).indexOf(host + ':' + port);
-  if (index == -1) {
-    console.error("[%s] The client didn't connect to you.", this.id);
-    return;
-  }
-  socket = this.socketServer[index].socket;
-  socket.write(message + '\n');
-}
-
-Node.prototype.sendMessageToReceiver = function(message) {
+Node.prototype.sendMessageToEntryRelayNodes = function(message) {
   var self = this;
   this.socketServer.forEach(function(element) {
     if (element.type == 'Entry Relay') {
       var result = element.address.split(':');
       var host = result[0];
       var port = result[1];
-      self._sendMessageToServer(host, port, message);
+      self._sendMessage('server', host, port, message);
     }
   });
 }

@@ -2,49 +2,38 @@
 
 const Node = require('./Node.js');
 
-var node1 = new Node({
-  id: 'node1',
-  port: 3000,
-  host: '127.0.0.1'
-});
+var id = ['node0', 'node1', 'node2', 'node3', 'node4', 'node5'];
+var port = [3000, 4000, 5000, 6000, 7000, 8000];
 
-var node2 = new Node({
-  id: 'node2',
-  port: 4000,
-  host: '127.0.0.1'
-});
+var nodesList = [];
 
-var node3 = new Node({
-  id: 'node3',
-  port: 5000,
-  host: '127.0.0.1'
-})
+for (var i = 0; i < 6; i++) {
+  nodesList.push(new Node({
+    id: id[i],
+    port: port[i],
+    host: '127.0.0.1'
+  }));
+}
 
-var node4 = new Node({
-  id: 'node4',
-  port: 6000,
-  host: '127.0.0.1'
-})
-
-var node5 = new Node({
-  id: 'node5',
-  port: 7000,
-  host: '127.0.0.1'
-})
+createTopology();
 
 var packet = {
-  sender: 'node1',
+  sender: 'node0',
   receiver: 'node5',
-  payload: 'test message'
+  payload: "test message"
 }
 var message = Buffer.from(JSON.stringify(packet));
 
-node1.connectToAnotherServer('Exit Relay', '127.0.0.1', 4000);
-node2.connectToAnotherServer('Gateway', '127.0.0.1', 5000);
-node4.connectToAnotherServer('Entry Relay', '127.0.0.1', 5000);
-node5.connectToAnotherServer('Entry Relay', '127.0.0.1', 6000);
-
 setTimeout(function() {
-  console.log('*After 1 sec*');
-  node1.sendMessageToExitRelayNodes(message);
+  console.log("*After 1 sec*");
+  console.log("[%s] Start sending message", nodesList[0].id);
+  nodesList[0].sendMessageToExitRelayNodes(message);
 }, 1000);
+
+function createTopology() {
+  nodesList[0].connectToAnotherServer('Exit Relay', '127.0.0.1', port[1]);
+  nodesList[1].connectToAnotherServer('Exit Relay', '127.0.0.1', port[2]);
+  nodesList[2].connectToAnotherServer('Gateway', '127.0.0.1', port[3]);
+  nodesList[4].connectToAnotherServer('Entry Relay', '127.0.0.1', port[3]);
+  nodesList[5].connectToAnotherServer('Entry Relay', '127.0.0.1', port[4]);
+}
