@@ -127,8 +127,8 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
     var index = self.socketClient.map(function(t) {
       return t.socket;
     }).indexOf(socket);
+    console.log("[%s] Connection %s is closed", self.id, self.socketClient[index].address);
     self.socketClient.splice(index, 1);
-    console.log("[%s] Connection %s:%d is closed", self.id, socket.remoteAddress, socket.remotePort);
   });
 };
 
