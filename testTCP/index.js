@@ -20,6 +20,7 @@ createTopology();
 var packet = {
   sender: 'node0',
   receiver: 'node5',
+  entryPathFilter: ['node3', 'node4', 'node5'],
   payload: "test message"
 }
 var message = Buffer.from(JSON.stringify(packet));

@@ -53,14 +53,14 @@ function Node(options) {
           else {
             // check the number of exit relay nodes
             var exitRelayNumber = 0;
-            self.socketClient.filter(function(item) {
+            self.socketClient.forEach(function(item) {
               if (item.type == 'Exit Relay') {
                 exitRelayNumber++;
               }
             });
             // check the number of gateway, i.e. from the last exit relay node to the first entry relay node
             var gatewayNumber = 0;
-            self.socketClient.filter(function(item) {
+            self.socketClient.forEach(function(item) {
               if (item.type == 'Gateway') {
                 gatewayNumber++;
               }
@@ -74,14 +74,33 @@ function Node(options) {
               self.sendMessageToGateway(element);
             }
             else {
-              console.log("[%s] Forward message to the entry relay node", self.id);
-              self.sendMessageToEntryRelayNodes(element);
+              var newEntryPathFilter = message.entryPathFilter.toString().split(',');
+              newEntryPathFilter.shift();
+              var nextNodeID = newEntryPathFilter[0];
+              console.log("[%s] Forward message to the entry relay node %s", self.id, nextNodeID);
+
+              var newPacket = {
+                sender: message.sender,
+                receiver: message.receiver,
+                entryPathFilter: newEntryPathFilter,
+                payload: message.payload
+              }
+              var newMessage = Buffer.from(JSON.stringify(newPacket));
+
+              self.socketServer.forEach(function(item) {
+                if (item.type == 'Entry Relay' && item.id == nextNodeID) {
+                  self.sendMessageToEntryRelayNode(nextNodeID, newMessage);
+                }
+              });
             }
           }
         }
         else {
+          // element = [node ID, relay type]
+          element = element.toString().split(',');
           self.socketServer.push({
-            type: element,
+            id: element[0],
+            type: element[1],
             address: socket.remoteAddress + ':' + socket.remotePort,
             socket: socket
           });
@@ -107,7 +126,8 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
   });
   socket.connect(port, host, function() {
     console.log("[%s] Connected to %s:%d", self.id, host, port);
-    socket.write(type + '\n');
+    var info = [self.id, type];
+    socket.write(info + '\n');
   });
   socket.on('data', function(data) {
     var message = JSON.parse(data.toString());
@@ -119,8 +139,24 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
       console.log("[%s] -----Message End-----", self.id);
     }
     else {
-      console.log("[%s] Forward message to the entry relay node", self.id);
-      self.sendMessageToEntryRelayNodes(data);
+      var newEntryPathFilter = message.entryPathFilter.toString().split(',');
+      newEntryPathFilter.shift();
+      var nextNodeID = newEntryPathFilter[0];
+      console.log("[%s] Forward message to the entry relay node %s", self.id, nextNodeID);
+
+      var newPacket = {
+        sender: message.sender,
+        receiver: message.receiver,
+        entryPathFilter: newEntryPathFilter,
+        payload: message.payload
+      }
+      var newMessage = Buffer.from(JSON.stringify(newPacket));
+
+      self.socketServer.forEach(function(item) {
+        if (item.type == 'Entry Relay' && item.id == nextNodeID) {
+          self.sendMessageToEntryRelayNode(nextNodeID, newMessage);
+        }
+      });
     }
   });
   socket.on('close', function() {
@@ -184,10 +220,10 @@ Node.prototype.sendMessageToGateway = function(message) {
   });
 }
 
-Node.prototype.sendMessageToEntryRelayNodes = function(message) {
+Node.prototype.sendMessageToEntryRelayNode = function(nextNodeID, message) {
   var self = this;
   this.socketServer.forEach(function(element) {
-    if (element.type == 'Entry Relay') {
+    if (element.type == 'Entry Relay' && element.id == nextNodeID) {
       var result = element.address.split(':');
       var host = result[0];
       var port = result[1];
