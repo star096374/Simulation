@@ -2,7 +2,7 @@ pragma solidity >=0.4.22 <0.6.0;
 
 contract Validation {
 
-    constructor() public {
+  constructor() public {
 
-    }
+  }
 }

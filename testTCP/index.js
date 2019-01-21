@@ -18,14 +18,14 @@ var port = [3000, 4000, 5000, 6000, 7000, 8000];
 var nodesList = [];
 
 web3.eth.getAccounts(function(err, accs) {
-	if (err != null) {
-		console.log("There was an error fetching your accounts.");
-		process.exit(1);
-	}
-	if (accs.length == 0) {
-		console.log("Couldn't get any accounts! Make sure your Ethereum client is configured correctly.");
-		process.exit(1);
-	}
+  if (err != null) {
+    console.log("There was an error fetching your accounts.");
+    process.exit(1);
+  }
+  if (accs.length == 0) {
+    console.log("Couldn't get any accounts! Make sure your Ethereum client is configured correctly.");
+    process.exit(1);
+  }
 
   for (var i = 0; i < 6; i++) {
     nodesList.push(new Node({
@@ -41,11 +41,11 @@ web3.eth.getAccounts(function(err, accs) {
 });
 
 var packet = {
-	sessionID: 1,
+  sessionID: 1,
   sender: 'node0',
   receiver: 'node5',
   entryPathFilter: ['node3', 'node4', 'node5'],
-	pathToken: ['node0'],
+  pathToken: ['node0'],
   payload: "test message"
 }
 var message = Buffer.from(JSON.stringify(packet));
