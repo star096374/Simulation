@@ -8,7 +8,7 @@ function Node(options) {
   }
   else {
     console.error("Node id is undefined");
-    return;
+    process.exit(1);
   }
 
   if (options.port !== undefined && options.host !== undefined) {
@@ -17,7 +17,23 @@ function Node(options) {
   }
   else {
     console.error("[%s] Server port or host is undefined", this.id);
-    return;
+    process.exit(1);
+  }
+
+  if (options.ethereumAccount !== undefined) {
+    this.ethereumAccount = options.ethereumAccount;
+  }
+  else {
+    console.error("[%s] Can't initialize the Ethereum account", this.id);
+    process.exit(1);
+  }
+
+  if (options.validationSystem !== undefined) {
+    this.validationSystem = options.validationSystem;
+  }
+  else {
+    console.error("[%s] Can't initialize the validation system", this.id);
+    process.exit(1);
   }
 
   var self = this;
@@ -44,13 +60,30 @@ function Node(options) {
         }
         if (isJson == true) {
           if (message.receiver == self.id) {
+            message.pathToken.push(self.id);
             console.log("[%s] -----Message Received-----", self.id);
+            console.log("[%s] Session ID: %s", self.id, message.sessionID);
             console.log("[%s] Sender: %s", self.id, message.sender);
             console.log("[%s] Receiver: %s", self.id, message.receiver);
-            console.log("[%s] Payload: %s", sel.f.id, message.payload);
+            console.log("[%s] Path Token: %s", self.id, message.pathToken);
+            console.log("[%s] Payload: %s", self.id, message.payload);
             console.log("[%s] -----Message End-----", self.id);
+            console.log("*Simulation Finish*");
+            process.exit(0);
           }
           else {
+            // add node ID to path token of the message
+            message.pathToken.push(self.id);
+            var packetWithNewPathToken = {
+              sessionID: message.sessionID,
+              sender: message.sender,
+              receiver: message.receiver,
+              entryPathFilter: message.entryPathFilter,
+              pathToken: message.pathToken,
+              payload: message.payload
+            }
+            var messageWithNewPathToken = Buffer.from(JSON.stringify(packetWithNewPathToken));
+
             // check the number of exit relay nodes
             var exitRelayNumber = 0;
             self.socketClient.forEach(function(item) {
@@ -67,11 +100,11 @@ function Node(options) {
             });
             if (exitRelayNumber > 0) {
               console.log("[%s] Forward message to exit relay nodes", self.id);
-              self.sendMessageToExitRelayNodes(element);
+              self.sendMessageToExitRelayNodes(messageWithNewPathToken);
             }
             else if (gatewayNumber > 0) {
               console.log("[%s] Forward message to gateway", self.id);
-              self.sendMessageToGateway(element);
+              self.sendMessageToGateway(messageWithNewPathToken);
             }
             else {
               var newEntryPathFilter = message.entryPathFilter.toString().split(',');
@@ -80,9 +113,11 @@ function Node(options) {
               console.log("[%s] Forward message to the entry relay node %s", self.id, nextNodeID);
 
               var newPacket = {
+                sessionID: message.sessionID,
                 sender: message.sender,
                 receiver: message.receiver,
                 entryPathFilter: newEntryPathFilter,
+                pathToken: message.pathToken,
                 payload: message.payload
               }
               var newMessage = Buffer.from(JSON.stringify(newPacket));
@@ -114,7 +149,7 @@ function Node(options) {
 Node.prototype.connectToAnotherServer = function(type, host, port) {
   if (type !== 'Exit Relay' && type !== 'Gateway' && type !== 'Entry Relay') {
     console.error("[%s] connectToAnotherServer: Invalid Type", this.id);
-    return;
+    process.exit(1);
   }
 
   var self = this;
@@ -131,12 +166,17 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
   });
   socket.on('data', function(data) {
     var message = JSON.parse(data.toString());
+    message.pathToken.push(self.id);
     if (message.receiver == self.id) {
       console.log("[%s] -----Message Received-----", self.id);
+      console.log("[%s] Session ID: %s", self.id, message.sessionID);
       console.log("[%s] Sender: %s", self.id, message.sender);
       console.log("[%s] Receiver: %s", self.id, message.receiver);
+      console.log("[%s] Path Token: %s", self.id, message.pathToken);
       console.log("[%s] Payload: %s", self.id, message.payload);
       console.log("[%s] -----Message End-----", self.id);
+      console.log("*Simulation Finish*");
+      process.exit(0);
     }
     else {
       var newEntryPathFilter = message.entryPathFilter.toString().split(',');
@@ -145,9 +185,11 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
       console.log("[%s] Forward message to the entry relay node %s", self.id, nextNodeID);
 
       var newPacket = {
+        sessionID: message.sessionID,
         sender: message.sender,
         receiver: message.receiver,
         entryPathFilter: newEntryPathFilter,
+        pathToken: message.pathToken,
         payload: message.payload
       }
       var newMessage = Buffer.from(JSON.stringify(newPacket));
@@ -182,7 +224,7 @@ Node.prototype._sendMessage = function(type, host, port, message) {
       break;
     default:
       console.error("_sendMessage: Invalid Type");
-      return;
+      process.exit(1);
   }
   var socket;
   var index = socketsList.map(function(t) {
@@ -190,7 +232,7 @@ Node.prototype._sendMessage = function(type, host, port, message) {
   }).indexOf(host + ':' + port);
   if (index == -1) {
     console.error(errorMessage);
-    return;
+    process.exit(1);
   }
   socket = socketsList[index].socket;
   socket.write(message + '\n');

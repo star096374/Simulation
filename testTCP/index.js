@@ -1,26 +1,51 @@
 'use strict';
 
 const Node = require('./Node.js');
+const Web3 = require('web3');
+const web3 = new Web3();
+const contract = require('truffle-contract');
+
+const validation_artifacts = require('../smart_contract/build/contracts/Validation.json');
+var Validation = contract(validation_artifacts);
+var validation = Validation.at('0x4c32f1bca17b78a9024a6a73014851fcbcec6819');
+
+web3.setProvider(new web3.providers.HttpProvider('http://localhost:8545'));
+Validation.setProvider(web3.currentProvider);
 
 var id = ['node0', 'node1', 'node2', 'node3', 'node4', 'node5'];
 var port = [3000, 4000, 5000, 6000, 7000, 8000];
 
 var nodesList = [];
 
-for (var i = 0; i < 6; i++) {
-  nodesList.push(new Node({
-    id: id[i],
-    port: port[i],
-    host: '127.0.0.1'
-  }));
-}
+web3.eth.getAccounts(function(err, accs) {
+	if (err != null) {
+		console.log("There was an error fetching your accounts.");
+		process.exit(1);
+	}
+	if (accs.length == 0) {
+		console.log("Couldn't get any accounts! Make sure your Ethereum client is configured correctly.");
+		process.exit(1);
+	}
 
-createTopology();
+  for (var i = 0; i < 6; i++) {
+    nodesList.push(new Node({
+      id: id[i],
+      port: port[i],
+      host: '127.0.0.1',
+      ethereumAccount: accs[i],
+      validationSystem: validation
+    }));
+  }
+
+  createTopology();
+});
 
 var packet = {
+	sessionID: 1,
   sender: 'node0',
   receiver: 'node5',
   entryPathFilter: ['node3', 'node4', 'node5'],
+	pathToken: ['node0'],
   payload: "test message"
 }
 var message = Buffer.from(JSON.stringify(packet));
