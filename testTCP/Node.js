@@ -274,4 +274,22 @@ Node.prototype.sendMessageToEntryRelayNode = function(nextNodeID, message) {
   });
 }
 
+Node.prototype.addSessionToValidationSystem = function(sessionID, receiver, message) {
+  var self = this;
+  this.validationSystem.addSession(sessionID, receiver, {from: this.ethereumAccount, gas: 1000000}).then(function() {
+    self.validationSystem.getSession(0).then(function(result) {
+      console.log("[%s] -----Data from Validation System-----", self.id);
+      console.log("[%s] SessionID: %d", self.id, result[0].toNumber());
+      console.log("[%s] Receiver address: %s", self.id, result[1]);
+      console.log("[%s] -----Data End-----", self.id);
+      console.log("[%s] Start sending message", self.id);
+      self.sendMessageToExitRelayNodes(message);
+    }).catch(function(err) {
+      console.log(err);
+    });
+  }).catch(function(err) {
+    console.log(err);
+  });
+}
+
 module.exports = Node;
