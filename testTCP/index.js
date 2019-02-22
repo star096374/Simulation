@@ -7,7 +7,7 @@ const contract = require('truffle-contract');
 
 const validation_artifacts = require('../smart_contract/build/contracts/Validation.json');
 var Validation = contract(validation_artifacts);
-var validation = Validation.at('0xc623ffcd3afb4adac0afea03c6d1091e8b36a37e');
+var validation = Validation.at('0x8dfa74fd5e64f2b15860a123a8ab7ac9ab2f8041');
 
 web3.setProvider(new web3.providers.HttpProvider('http://localhost:8545'));
 Validation.setProvider(web3.currentProvider);
@@ -53,7 +53,7 @@ var message = Buffer.from(JSON.stringify(packet));
 setTimeout(function() {
   console.log("*After 1 sec*");
   console.log("[%s] Add Session struct to Validation System", nodesList[0].id);
-  nodesList[0].addSessionToValidationSystem(packet.sessionID, nodesList[5].ethereumAccount, message);
+  nodesList[0].addSessionToValidationSystem(packet.sessionID, nodesList[5].ethereumAccount, message, packet.payload);
 }, 1000);
 
 function createTopology() {

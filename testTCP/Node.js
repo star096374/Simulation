@@ -1,6 +1,7 @@
 'use strict';
 
 const net = require('net');
+const sha256 = require('js-sha256');
 
 function Node(options) {
   if (options.id !== undefined) {
@@ -98,36 +99,55 @@ function Node(options) {
                 gatewayNumber++;
               }
             });
-            if (exitRelayNumber > 0) {
-              console.log("[%s] Forward message to exit relay nodes", self.id);
-              self.sendMessageToExitRelayNodes(messageWithNewPathToken);
-            }
-            else if (gatewayNumber > 0) {
-              console.log("[%s] Forward message to gateway", self.id);
-              self.sendMessageToGateway(messageWithNewPathToken);
-            }
-            else {
-              var newEntryPathFilter = message.entryPathFilter.toString().split(',');
-              newEntryPathFilter.shift();
-              var nextNodeID = newEntryPathFilter[0];
-              console.log("[%s] Forward message to the entry relay node %s", self.id, nextNodeID);
 
-              var newPacket = {
-                sessionID: message.sessionID,
-                sender: message.sender,
-                receiver: message.receiver,
-                entryPathFilter: newEntryPathFilter,
-                pathToken: message.pathToken,
-                payload: message.payload
-              }
-              var newMessage = Buffer.from(JSON.stringify(newPacket));
+            // hash payload by sha256, and then upload to Validation System
+            console.log("[%s] Upload hashed payload to Validation System", self.id);
+            var seed = self._generateRandomString();
+            var hashedPayload = sha256(seed + message.payload);
+            self.validationSystem.uploadData(message.sessionID, hashedPayload, {from: self.ethereumAccount, gas: 1000000}).then(function() {
+              var dataIndex = Number(self.id[4]);
+              self.validationSystem.getData(dataIndex).then(function(result) {
+                console.log("[%s] -----Data from Validation System-----", self.id);
+                console.log("[%s] SessionID: %d", self.id, result[0].toNumber());
+                console.log("[%s] Hash value: %s", self.id, result[1]);
+                console.log("[%s] -----Data End-----", self.id);
 
-              self.socketServer.forEach(function(item) {
-                if (item.type == 'Entry Relay' && item.id == nextNodeID) {
-                  self.sendMessageToEntryRelayNode(nextNodeID, newMessage);
+                if (exitRelayNumber > 0) {
+                  console.log("[%s] Forward message to exit relay nodes", self.id);
+                  self.sendMessageToExitRelayNodes(messageWithNewPathToken);
                 }
+                else if (gatewayNumber > 0) {
+                  console.log("[%s] Forward message to gateway", self.id);
+                  self.sendMessageToGateway(messageWithNewPathToken);
+                }
+                else {
+                  var newEntryPathFilter = message.entryPathFilter.toString().split(',');
+                  newEntryPathFilter.shift();
+                  var nextNodeID = newEntryPathFilter[0];
+                  console.log("[%s] Forward message to the entry relay node %s", self.id, nextNodeID);
+
+                  var newPacket = {
+                    sessionID: message.sessionID,
+                    sender: message.sender,
+                    receiver: message.receiver,
+                    entryPathFilter: newEntryPathFilter,
+                    pathToken: message.pathToken,
+                    payload: message.payload
+                  }
+                  var newMessage = Buffer.from(JSON.stringify(newPacket));
+
+                  self.socketServer.forEach(function(item) {
+                    if (item.type == 'Entry Relay' && item.id == nextNodeID) {
+                      self.sendMessageToEntryRelayNode(nextNodeID, newMessage);
+                    }
+                  });
+                }
+              }).catch(function(err) {
+                console.log(err);
               });
-            }
+            }).catch(function(err) {
+              console.log(err);
+            });
           }
         }
         else {
@@ -182,7 +202,6 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
       var newEntryPathFilter = message.entryPathFilter.toString().split(',');
       newEntryPathFilter.shift();
       var nextNodeID = newEntryPathFilter[0];
-      console.log("[%s] Forward message to the entry relay node %s", self.id, nextNodeID);
 
       var newPacket = {
         sessionID: message.sessionID,
@@ -194,10 +213,29 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
       }
       var newMessage = Buffer.from(JSON.stringify(newPacket));
 
-      self.socketServer.forEach(function(item) {
-        if (item.type == 'Entry Relay' && item.id == nextNodeID) {
-          self.sendMessageToEntryRelayNode(nextNodeID, newMessage);
-        }
+      // hash payload by sha256, and then upload to Validation System
+      console.log("[%s] Upload hashed payload to Validation System", self.id);
+      var seed = self._generateRandomString();
+      var hashedPayload = sha256(seed + message.payload);
+      self.validationSystem.uploadData(message.sessionID, hashedPayload, {from: self.ethereumAccount, gas: 1000000}).then(function() {
+        var dataIndex = Number(self.id[4]);
+        self.validationSystem.getData(dataIndex).then(function(result) {
+          console.log("[%s] -----Data from Validation System-----", self.id);
+          console.log("[%s] SessionID: %d", self.id, result[0].toNumber());
+          console.log("[%s] Hash value: %s", self.id, result[1]);
+          console.log("[%s] -----Data End-----", self.id);
+
+          console.log("[%s] Forward message to the entry relay node %s", self.id, nextNodeID);
+          self.socketServer.forEach(function(item) {
+            if (item.type == 'Entry Relay' && item.id == nextNodeID) {
+              self.sendMessageToEntryRelayNode(nextNodeID, newMessage);
+            }
+          });
+        }).catch(function(err) {
+          console.log(err);
+        });
+      }).catch(function(err) {
+        console.log(err);
       });
     }
   });
@@ -274,7 +312,7 @@ Node.prototype.sendMessageToEntryRelayNode = function(nextNodeID, message) {
   });
 }
 
-Node.prototype.addSessionToValidationSystem = function(sessionID, receiver, message) {
+Node.prototype.addSessionToValidationSystem = function(sessionID, receiver, message, payload) {
   var self = this;
   this.validationSystem.addSession(sessionID, receiver, {from: this.ethereumAccount, gas: 1000000}).then(function() {
     self.validationSystem.getSession(0).then(function(result) {
@@ -282,14 +320,43 @@ Node.prototype.addSessionToValidationSystem = function(sessionID, receiver, mess
       console.log("[%s] SessionID: %d", self.id, result[0].toNumber());
       console.log("[%s] Receiver address: %s", self.id, result[1]);
       console.log("[%s] -----Data End-----", self.id);
-      console.log("[%s] Start sending message", self.id);
-      self.sendMessageToExitRelayNodes(message);
+
+      // hash payload by sha256, and then upload to Validation System
+      console.log("[%s] Upload hashed payload to Validation System", self.id);
+      var seed = self._generateRandomString();
+      var hashedPayload = sha256(seed + payload);
+      self.validationSystem.uploadData(sessionID, hashedPayload, {from: self.ethereumAccount, gas: 1000000}).then(function() {
+        var dataIndex = Number(self.id[4]);
+        self.validationSystem.getData(dataIndex).then(function(result) {
+          console.log("[%s] -----Data from Validation System-----", self.id);
+          console.log("[%s] SessionID: %d", self.id, result[0].toNumber());
+          console.log("[%s] Hash value: %s", self.id, result[1]);
+          console.log("[%s] -----Data End-----", self.id);
+          console.log("[%s] Start sending message", self.id);
+          self.sendMessageToExitRelayNodes(message);
+        }).catch(function(err) {
+          console.log(err);
+        });
+      }).catch(function(err) {
+        console.log(err);
+      });
     }).catch(function(err) {
       console.log(err);
     });
   }).catch(function(err) {
     console.log(err);
   });
+}
+
+Node.prototype._generateRandomString = function() {
+  var text = "";
+  var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+  for (var i = 0; i < 10; i++) {
+    text += possible.charAt(Math.floor(Math.random() * possible.length));
+  }
+
+  return text;
 }
 
 module.exports = Node;

@@ -1,3 +1,4 @@
 node_modules/
 package-lock.json
 smart_contract/build/
+testTCP/log.txt
