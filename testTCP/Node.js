@@ -69,8 +69,27 @@ function Node(options) {
             console.log("[%s] Path Token: %s", self.id, message.pathToken);
             console.log("[%s] Payload: %s", self.id, message.payload);
             console.log("[%s] -----Message End-----", self.id);
-            console.log("*Simulation Finish*");
-            process.exit(0);
+
+            // upload payload and pathToken to Validation System
+            self.validationSystem.uploadPayloadAndPathToken(message.sessionID, message.payload, message.pathToken.toString(), {from: self.ethereumAccount, gas: 1000000}).then(function() {
+              console.log("[%s] Upload payload and path token to Validation System", self.id);
+
+              self.validationSystem.getSession(0).then(function(result) {
+                console.log("[%s] -----Data from Validation System-----", self.id);
+                console.log("[%s] SessionID: %d", self.id, result[0].toNumber());
+                console.log("[%s] Receiver address: %s", self.id, result[1]);
+                console.log("[%s] Payload: %s", self.id, result[2]);
+                console.log("[%s] Path Token: %s", self.id, result[3]);
+                console.log("[%s] -----Data End-----", self.id);
+
+                console.log("*Simulation Finish*");
+                process.exit(0);
+              }).catch(function(err) {
+                console.log(err);
+              });
+            }).catch(function(err) {
+              console.log(err);
+            });
           }
           else {
             // add node ID to path token of the message
@@ -195,8 +214,27 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
       console.log("[%s] Path Token: %s", self.id, message.pathToken);
       console.log("[%s] Payload: %s", self.id, message.payload);
       console.log("[%s] -----Message End-----", self.id);
-      console.log("*Simulation Finish*");
-      process.exit(0);
+
+      // upload payload and pathToken to Validation System
+      self.validationSystem.uploadPayloadAndPathToken(message.sessionID, message.payload, message.pathToken.toString(), {from: self.ethereumAccount, gas: 1000000}).then(function() {
+        console.log("[%s] Upload payload and path token to Validation System", self.id);
+
+        self.validationSystem.getSession(0).then(function(result) {
+          console.log("[%s] -----Data from Validation System-----", self.id);
+          console.log("[%s] SessionID: %d", self.id, result[0].toNumber());
+          console.log("[%s] Receiver address: %s", self.id, result[1]);
+          console.log("[%s] Payload: %s", self.id, result[2]);
+          console.log("[%s] Path Token: %s", self.id, result[3]);
+          console.log("[%s] -----Data End-----", self.id);
+
+          console.log("*Simulation Finish*");
+          process.exit(0);
+        }).catch(function(err) {
+          console.log(err);
+        });
+      }).catch(function(err) {
+        console.log(err);
+      });
     }
     else {
       var newEntryPathFilter = message.entryPathFilter.toString().split(',');

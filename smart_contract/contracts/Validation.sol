@@ -66,8 +66,8 @@ contract Validation {
     return (DataArray[index].sessionID, DataArray[index].hashValue, DataArray[index].seed);
   }
 
-  function getSession(uint256 index) public view returns(uint256, address) {
-    return (SessionArray[index].id, SessionArray[index].receiver);
+  function getSession(uint256 index) public view returns(uint256, address, string, string) {
+    return (SessionArray[index].id, SessionArray[index].receiver, SessionArray[index].payload, SessionArray[index].pathToken);
   }
 
 }
