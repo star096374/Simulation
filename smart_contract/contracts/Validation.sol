@@ -2,6 +2,8 @@ pragma solidity >=0.4.22 <0.6.0;
 
 contract Validation {
 
+  event timeToUploadSeed(uint256 sessionID, address receiver, string pathToken);
+
   struct Session {
     uint256 id;
     address receiver;
@@ -40,6 +42,7 @@ contract Validation {
         SessionArray[i].pathToken = _pathToken;
       }
     }
+    emit timeToUploadSeed(_sessionID, msg.sender, _pathToken);
   }
 
   function uploadSeed(uint256 _sessionID, string _hashValue, string _seed) public {

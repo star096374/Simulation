@@ -7,7 +7,7 @@ const contract = require('truffle-contract');
 
 const validation_artifacts = require('../smart_contract/build/contracts/Validation.json');
 var Validation = contract(validation_artifacts);
-var validation = Validation.at('0x5a5a790754539c22fadffd38e7dd885fb0690050');
+var validation = Validation.at('0x000920c6a1f788e301dae4f11cd6397a57e42db1');
 
 web3.setProvider(new web3.providers.HttpProvider('http://localhost:8545'));
 Validation.setProvider(web3.currentProvider);

@@ -31,6 +31,10 @@ function Node(options) {
 
   if (options.validationSystem !== undefined) {
     this.validationSystem = options.validationSystem;
+    this.seedArray = [];
+
+    var timeToUploadSeed = this.validationSystem.timeToUploadSeed({fromBlock: 0, toBlock: 'latest'});
+    this._addTimeToUploadSeedListener(timeToUploadSeed);
   }
   else {
     console.error("[%s] Can't initialize the validation system", this.id);
@@ -81,9 +85,6 @@ function Node(options) {
                 console.log("[%s] Payload: %s", self.id, result[2]);
                 console.log("[%s] Path Token: %s", self.id, result[3]);
                 console.log("[%s] -----Data End-----", self.id);
-
-                console.log("*Simulation Finish*");
-                process.exit(0);
               }).catch(function(err) {
                 console.log(err);
               });
@@ -123,6 +124,11 @@ function Node(options) {
             console.log("[%s] Upload hashed payload to Validation System", self.id);
             var seed = self._generateRandomString();
             var hashedPayload = sha256(seed + message.payload);
+            self.seedArray.push({
+              sessionID: message.sessionID,
+              hash: hashedPayload,
+              seed: seed
+            });
             self.validationSystem.uploadData(message.sessionID, hashedPayload, {from: self.ethereumAccount, gas: 1000000}).then(function() {
               var dataIndex = Number(self.id[4]);
               self.validationSystem.getData(dataIndex).then(function(result) {
@@ -226,9 +232,6 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
           console.log("[%s] Payload: %s", self.id, result[2]);
           console.log("[%s] Path Token: %s", self.id, result[3]);
           console.log("[%s] -----Data End-----", self.id);
-
-          console.log("*Simulation Finish*");
-          process.exit(0);
         }).catch(function(err) {
           console.log(err);
         });
@@ -255,6 +258,11 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
       console.log("[%s] Upload hashed payload to Validation System", self.id);
       var seed = self._generateRandomString();
       var hashedPayload = sha256(seed + message.payload);
+      self.seedArray.push({
+        sessionID: message.sessionID,
+        hash: hashedPayload,
+        seed: seed
+      });
       self.validationSystem.uploadData(message.sessionID, hashedPayload, {from: self.ethereumAccount, gas: 1000000}).then(function() {
         var dataIndex = Number(self.id[4]);
         self.validationSystem.getData(dataIndex).then(function(result) {
@@ -363,6 +371,11 @@ Node.prototype.addSessionToValidationSystem = function(sessionID, receiver, mess
       console.log("[%s] Upload hashed payload to Validation System", self.id);
       var seed = self._generateRandomString();
       var hashedPayload = sha256(seed + payload);
+      self.seedArray.push({
+        sessionID: sessionID,
+        hash: hashedPayload,
+        seed: seed
+      });
       self.validationSystem.uploadData(sessionID, hashedPayload, {from: self.ethereumAccount, gas: 1000000}).then(function() {
         var dataIndex = Number(self.id[4]);
         self.validationSystem.getData(dataIndex).then(function(result) {
@@ -395,6 +408,58 @@ Node.prototype._generateRandomString = function() {
   }
 
   return text;
+}
+
+Node.prototype._addTimeToUploadSeedListener = function(timeToUploadSeed) {
+  var self = this;
+  timeToUploadSeed.watch(function(error, result) {
+    if (!error) {
+      /*console.log("[%s] Event timeToUploadSeed is triggered", self.id);
+      console.log("[%s] -----Data from Validation System-----", self.id);
+      console.log("[%s] SessionID: %d", self.id, result.args.sessionID);
+      console.log("[%s] Receiver address: %s", self.id, result.args.receiver);
+      console.log("[%s] Path Token: %s", self.id, result.args.pathToken);
+      console.log("[%s] -----Data End-----", self.id);*/
+
+      // if you are receiver, you don't have to upload seed
+      if (result.args.receiver == self.ethereumAccount) {
+        return;
+      }
+
+      // check whether you are in the path token
+      var pathTokenArray = result.args.pathToken.split(',');
+      pathTokenArray.forEach(function(element) {
+        if (element == self.id) {
+          // according to sessionID, upload seed to Validation System
+          var hash, seed;
+          self.seedArray.forEach(function(item) {
+            if (item.sessionID == result.args.sessionID) {
+              hash = item.hash;
+              seed = item.seed;
+            }
+          });
+          self.validationSystem.uploadSeed(result.args.sessionID, hash, seed, {from: self.ethereumAccount}).then(function() {
+            var dataIndex = Number(self.id[4]);
+            self.validationSystem.getData(dataIndex).then(function(result) {
+              console.log("[%s] check whether seed is uploaded to Validation System", self.id);
+              console.log("[%s] -----Data from Validation System-----", self.id);
+              console.log("[%s] SessionID: %d", self.id, result[0].toNumber());
+              console.log("[%s] Hash value: %s", self.id, result[1]);
+              console.log("[%s] Seed: %s", self.id, result[2]);
+              console.log("[%s] -----Data End-----", self.id);
+            }).catch(function(err) {
+              console.log(err);
+            });
+          }).catch(function(err) {
+            console.log(err);
+          });
+        }
+      });
+    }
+    else {
+      console.log(error);
+    }
+  });
 }
 
 module.exports = Node;
