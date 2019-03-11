@@ -129,7 +129,7 @@ function Node(options) {
               hash: hashedPayload,
               seed: seed
             });
-            self.validationSystem.uploadData(message.sessionID, hashedPayload, {from: self.ethereumAccount, gas: 1000000}).then(function() {
+            self.validationSystem.uploadData(message.sessionID, self.id, hashedPayload, {from: self.ethereumAccount, gas: 1000000}).then(function() {
               var dataIndex = Number(self.id[4]);
               self.validationSystem.getData(dataIndex).then(function(result) {
                 console.log("[%s] -----Data from Validation System-----", self.id);
@@ -263,7 +263,7 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
         hash: hashedPayload,
         seed: seed
       });
-      self.validationSystem.uploadData(message.sessionID, hashedPayload, {from: self.ethereumAccount, gas: 1000000}).then(function() {
+      self.validationSystem.uploadData(message.sessionID, self.id, hashedPayload, {from: self.ethereumAccount, gas: 1000000}).then(function() {
         var dataIndex = Number(self.id[4]);
         self.validationSystem.getData(dataIndex).then(function(result) {
           console.log("[%s] -----Data from Validation System-----", self.id);
@@ -376,7 +376,7 @@ Node.prototype.addSessionToValidationSystem = function(sessionID, receiver, mess
         hash: hashedPayload,
         seed: seed
       });
-      self.validationSystem.uploadData(sessionID, hashedPayload, {from: self.ethereumAccount, gas: 1000000}).then(function() {
+      self.validationSystem.uploadData(sessionID, self.id, hashedPayload, {from: self.ethereumAccount, gas: 1000000}).then(function() {
         var dataIndex = Number(self.id[4]);
         self.validationSystem.getData(dataIndex).then(function(result) {
           console.log("[%s] -----Data from Validation System-----", self.id);
@@ -438,7 +438,7 @@ Node.prototype._addTimeToUploadSeedListener = function(timeToUploadSeed) {
               seed = item.seed;
             }
           });
-          self.validationSystem.uploadSeed(result.args.sessionID, hash, seed, {from: self.ethereumAccount}).then(function() {
+          self.validationSystem.uploadSeed(result.args.sessionID, hash, seed, {from: self.ethereumAccount, gas: 1000000}).then(function() {
             var dataIndex = Number(self.id[4]);
             self.validationSystem.getData(dataIndex).then(function(result) {
               console.log("[%s] check whether seed is uploaded to Validation System", self.id);
