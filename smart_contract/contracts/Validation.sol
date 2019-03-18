@@ -2,6 +2,13 @@ pragma solidity >=0.4.22 <0.6.0;
 
 import "solidity-util/lib/Strings.sol";
 
+// a limited definition of the contract we wish to access
+contract ReputationInterface {
+  function addReputation(uint256, bool) public pure {
+
+  }
+}
+
 contract Validation {
 
   using Strings for string;
@@ -30,22 +37,29 @@ contract Validation {
   Session[] SessionArray;
   Data[] DataArray;
 
-  constructor() public {
+  // notice that the type here is the contract definition itself
+  ReputationInterface private reputation;
 
+  // we will set the contract address that we wish to access in our constructor
+  constructor(address _reputationAddress) public {
+    // make sure that the address isn't empty
+    require(_reputationAddress != address(0));
+
+    // set the contract that we want to access by using the definiton at the top and use the address provided
+    reputation = ReputationInterface(_reputationAddress);
   }
 
-  function addSession(uint256 sessionID, address receiver) public {
-    SessionArray.push(Session(sessionID, receiver, "", "", false, false, false));
+  function addSession(uint256 sessionID, address receiver, string payload) public {
+    SessionArray.push(Session(sessionID, receiver, payload, "", false, false, false));
   }
 
   function uploadData(uint256 sessionID, string senderID, string hashValue) public {
     DataArray.push(Data(sessionID, msg.sender, senderID, hashValue, "", false));
   }
 
-  function uploadPayloadAndPathToken(uint256 _sessionID, string _payload, string _pathToken) public {
+  function uploadPathToken(uint256 _sessionID, string _pathToken) public {
     for (uint256 i = 0; i < SessionArray.length; i++) {
       if (SessionArray[i].id == _sessionID) {
-        SessionArray[i].payload = _payload;
         SessionArray[i].pathToken = _pathToken;
         break;
       }
@@ -127,6 +141,7 @@ contract Validation {
         break;
       }
     }
+    addReputation(_sessionID, _isSuccessful);
   }
 
   function getData(uint256 index) public view returns(uint256, string, string) {
@@ -135,6 +150,11 @@ contract Validation {
 
   function getSession(uint256 index) public view returns(uint256, address, string, string, bool) {
     return (SessionArray[index].id, SessionArray[index].receiver, SessionArray[index].payload, SessionArray[index].pathToken, SessionArray[index].isSuccessful);
+  }
+
+  function addReputation(uint256 _sessionID, bool _isSuccessful) public view {
+    // access contract function located in other contract
+    reputation.addReputation(_sessionID, _isSuccessful);
   }
 
 }

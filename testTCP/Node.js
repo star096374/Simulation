@@ -74,15 +74,14 @@ function Node(options) {
             console.log("[%s] Payload: %s", self.id, message.payload);
             console.log("[%s] -----Message End-----", self.id);
 
-            // upload payload and pathToken to Validation System
-            self.validationSystem.uploadPayloadAndPathToken(message.sessionID, message.payload, message.pathToken.toString(), {from: self.ethereumAccount, gas: 1000000}).then(function() {
-              console.log("[%s] Upload payload and path token to Validation System", self.id);
+            // upload pathToken to Validation System
+            self.validationSystem.uploadPathToken(message.sessionID, message.pathToken.toString(), {from: self.ethereumAccount, gas: 1000000}).then(function() {
+              console.log("[%s] Upload path token to Validation System", self.id);
 
               self.validationSystem.getSession(0).then(function(result) {
                 console.log("[%s] -----Data from Validation System-----", self.id);
                 console.log("[%s] SessionID: %d", self.id, result[0].toNumber());
                 console.log("[%s] Receiver address: %s", self.id, result[1]);
-                console.log("[%s] Payload: %s", self.id, result[2]);
                 console.log("[%s] Path Token: %s", self.id, result[3]);
                 console.log("[%s] -----Data End-----", self.id);
               }).catch(function(err) {
@@ -221,15 +220,14 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
       console.log("[%s] Payload: %s", self.id, message.payload);
       console.log("[%s] -----Message End-----", self.id);
 
-      // upload payload and pathToken to Validation System
-      self.validationSystem.uploadPayloadAndPathToken(message.sessionID, message.payload, message.pathToken.toString(), {from: self.ethereumAccount, gas: 1000000}).then(function() {
-        console.log("[%s] Upload payload and path token to Validation System", self.id);
+      // upload pathToken to Validation System
+      self.validationSystem.uploadPathToken(message.sessionID, message.pathToken.toString(), {from: self.ethereumAccount, gas: 1000000}).then(function() {
+        console.log("[%s] Upload path token to Validation System", self.id);
 
         self.validationSystem.getSession(0).then(function(result) {
           console.log("[%s] -----Data from Validation System-----", self.id);
           console.log("[%s] SessionID: %d", self.id, result[0].toNumber());
           console.log("[%s] Receiver address: %s", self.id, result[1]);
-          console.log("[%s] Payload: %s", self.id, result[2]);
           console.log("[%s] Path Token: %s", self.id, result[3]);
           console.log("[%s] -----Data End-----", self.id);
         }).catch(function(err) {
@@ -360,11 +358,12 @@ Node.prototype.sendMessageToEntryRelayNode = function(nextNodeID, message) {
 
 Node.prototype.addSessionToValidationSystem = function(sessionID, receiver, message, payload) {
   var self = this;
-  this.validationSystem.addSession(sessionID, receiver, {from: this.ethereumAccount, gas: 1000000}).then(function() {
+  this.validationSystem.addSession(sessionID, receiver, payload, {from: this.ethereumAccount, gas: 1000000}).then(function() {
     self.validationSystem.getSession(0).then(function(result) {
       console.log("[%s] -----Data from Validation System-----", self.id);
       console.log("[%s] SessionID: %d", self.id, result[0].toNumber());
       console.log("[%s] Receiver address: %s", self.id, result[1]);
+      console.log("[%s] Payload: %s", self.id, result[2])
       console.log("[%s] -----Data End-----", self.id);
 
       // hash payload by sha256, and then upload to Validation System

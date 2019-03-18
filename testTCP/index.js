@@ -8,7 +8,7 @@ const sha256 = require('js-sha256');
 
 const validation_artifacts = require('../smart_contract/build/contracts/Validation.json');
 var Validation = contract(validation_artifacts);
-var validation = Validation.at('0xb9d4e00797ee026506baf05eb1d29622d64e02dc');
+var validation = Validation.at('0xa682e2b0a6749b483178e1c2aa3703883722f668');
 
 web3.setProvider(new web3.providers.HttpProvider('http://localhost:8545'));
 Validation.setProvider(web3.currentProvider);
@@ -144,7 +144,7 @@ function doProofOfBandwidth(sessionID, payload, pathTokenList, dataArray) {
     validation.getSession(0).then(function(result) {
       console.log("[checker] -----Data from Validation System-----");
       console.log("[checker] SessionID: %d", result[0].toNumber());
-      console.log("[checker] isSuccessful:", result[4]);
+      console.log("[checker] isSuccessful: %s", result[4].toString());
       console.log("[checker] -----Data End-----");
 
       console.log("*Simulation Finish*");
