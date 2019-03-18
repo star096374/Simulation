@@ -37,7 +37,17 @@ function Node(options) {
     this._addTimeToUploadSeedListener(timeToUploadSeed);
   }
   else {
-    console.error("[%s] Can't initialize the validation system", this.id);
+    console.error("[%s] Can't initialize Validation System", this.id);
+    process.exit(1);
+  }
+
+  if (options.reputationSystem !== undefined) {
+    this.reputationSystem = options.reputationSystem;
+
+    this._registerInReputationSystem();
+  }
+  else {
+    console.error("[%s] Can't initialize Reputation System", this.id);
     process.exit(1);
   }
 
@@ -458,6 +468,23 @@ Node.prototype._addTimeToUploadSeedListener = function(timeToUploadSeed) {
     else {
       console.log(error);
     }
+  });
+}
+
+Node.prototype._registerInReputationSystem = function() {
+  var self = this;
+  this.reputationSystem.initReputationScore({from: self.ethereumAccount}).then(function() {
+      console.log("[%s] Registered in Reputation System", self.id);
+    self.reputationSystem.getReputationScore().then(function(result) {
+      console.log("[%s] Get reputation score from Reputation System", self.id);
+      console.log("[%s] -----Data from Reputation System-----", self.id);
+      console.log("[%s] Reputation score: %d", self.id, result.toNumber());
+      console.log("[%s] -----Data End-----", self.id);
+    }).catch(function(err) {
+      console.log(err);
+    });
+  }).catch(function(err) {
+    console.log(err);
   });
 }
 

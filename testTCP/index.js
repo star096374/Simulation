@@ -5,13 +5,29 @@ const Web3 = require('web3');
 const web3 = new Web3();
 const contract = require('truffle-contract');
 const sha256 = require('js-sha256');
+const fs = require('fs');
+
+var validationABI = fs.readFileSync('../smart_contract/build/contracts/Validation.json');
+var parsedValidationABI = JSON.parse(validationABI);
+var lastNetworksKeyOfValidation = Object.keys(parsedValidationABI.networks).slice(-1)[0];
+var validationAddress = parsedValidationABI.networks[lastNetworksKeyOfValidation].address;
 
 const validation_artifacts = require('../smart_contract/build/contracts/Validation.json');
 var Validation = contract(validation_artifacts);
-var validation = Validation.at('0xa682e2b0a6749b483178e1c2aa3703883722f668');
+var validation = Validation.at(validationAddress);
+
+var reputationABI = fs.readFileSync('../smart_contract/build/contracts/Reputation.json');
+var parsedReputationABI = JSON.parse(reputationABI);
+var lastNetworksKeyOfReputation = Object.keys(parsedReputationABI.networks).slice(-1)[0];
+var reputationAddress = parsedReputationABI.networks[lastNetworksKeyOfReputation].address;
+
+const reputation_artifacts = require('../smart_contract/build/contracts/Reputation.json');
+var Reputation = contract(reputation_artifacts);
+var reputation = Reputation.at(reputationAddress);
 
 web3.setProvider(new web3.providers.HttpProvider('http://localhost:8545'));
 Validation.setProvider(web3.currentProvider);
+Reputation.setProvider(web3.currentProvider);
 
 var id = ['node0', 'node1', 'node2', 'node3', 'node4', 'node5'];
 var port = [3000, 4000, 5000, 6000, 7000, 8000];
@@ -36,14 +52,15 @@ web3.eth.getAccounts(function(err, accs) {
       port: port[i],
       host: '127.0.0.1',
       ethereumAccount: accs[i],
-      validationSystem: validation
+      validationSystem: validation,
+      reputationSystem: reputation
     }));
   }
 
   createTopology();
 
   checkerEthereumAccount = accs[6];
-  setTimeout(getDataForProofOfBandwidth, 10000);
+  setTimeout(getDataForProofOfBandwidth, 15000);
 });
 
 var packet = {
@@ -57,12 +74,12 @@ var packet = {
 var message = Buffer.from(JSON.stringify(packet));
 
 setTimeout(function() {
-  console.log("*After 1 sec*");
+  console.log("*After 5 secs*");
   console.log("[%s] Add Session struct to Validation System", nodesList[0].id);
 
   var receiverIndex = Number(packet.receiver[4]);
   nodesList[0].addSessionToValidationSystem(packet.sessionID, nodesList[receiverIndex].ethereumAccount, message, packet.payload);
-}, 1000);
+}, 5000);
 
 function createTopology() {
   nodesList[0].connectToAnotherServer('Exit Relay', '127.0.0.1', port[1]);
@@ -73,7 +90,7 @@ function createTopology() {
 }
 
 function getDataForProofOfBandwidth() {
-  console.log("*After 10 secs*");
+  console.log("*After 15 secs*");
   console.log("[checker] Get data for proof of bandwidth");
 
   var sessionID, payload, pathToken;
