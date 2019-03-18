@@ -60,7 +60,7 @@ web3.eth.getAccounts(function(err, accs) {
   createTopology();
 
   checkerEthereumAccount = accs[6];
-  setTimeout(getDataForProofOfBandwidth, 15000);
+  setTimeout(getDataForProofOfBandwidth, 10000);
 });
 
 var packet = {
@@ -90,7 +90,7 @@ function createTopology() {
 }
 
 function getDataForProofOfBandwidth() {
-  console.log("*After 15 secs*");
+  console.log("*After 10 secs*");
   console.log("[checker] Get data for proof of bandwidth");
 
   var sessionID, payload, pathToken;
@@ -157,15 +157,12 @@ function doProofOfBandwidth(sessionID, payload, pathTokenList, dataArray) {
   }
 
   console.log("[checker] Set the result of proof of bandwidth to Validation System");
-  validation.setSessionIsSuccessful(sessionID, result, {from: checkerEthereumAccount}).then(function() {
+  validation.setSessionIsSuccessful(sessionID, result, pathTokenList.toString(), {from: checkerEthereumAccount, gas: 1000000}).then(function() {
     validation.getSession(0).then(function(result) {
       console.log("[checker] -----Data from Validation System-----");
       console.log("[checker] SessionID: %d", result[0].toNumber());
       console.log("[checker] isSuccessful: %s", result[4].toString());
       console.log("[checker] -----Data End-----");
-
-      console.log("*Simulation Finish*");
-      process.exit(0);
     }).catch(function(err) {
       console.log(err);
     });
@@ -173,3 +170,24 @@ function doProofOfBandwidth(sessionID, payload, pathTokenList, dataArray) {
     console.log(err);
   });
 }
+
+setTimeout(function() {
+  console.log("*After 15 secs*");
+  var counter = 0;
+  for (var i = 0; i < nodesList.length; i++) {
+    nodesList[i].reputationSystem.getReputationScore().then(function(result) {
+      console.log("[%s] Get reputation score from Reputation System", id[counter]);
+      console.log("[%s] -----Data from Reputation System-----", id[counter]);
+      console.log("[%s] Reputation score: %d", id[counter], result.toNumber());
+      console.log("[%s] -----Data End-----", id[counter]);
+
+      counter += 1;
+      if (counter == nodesList.length) {
+        console.log("*Simulation Finish*");
+        process.exit(0);
+      }
+    }).catch(function(err) {
+      console.log(err);
+    });
+  }
+}, 15000);

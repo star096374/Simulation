@@ -473,8 +473,8 @@ Node.prototype._addTimeToUploadSeedListener = function(timeToUploadSeed) {
 
 Node.prototype._registerInReputationSystem = function() {
   var self = this;
-  this.reputationSystem.initReputationScore({from: self.ethereumAccount}).then(function() {
-      console.log("[%s] Registered in Reputation System", self.id);
+  this.reputationSystem.initReputationScore(self.id, {from: self.ethereumAccount}).then(function() {
+    console.log("[%s] Registered in Reputation System", self.id);
     self.reputationSystem.getReputationScore().then(function(result) {
       console.log("[%s] Get reputation score from Reputation System", self.id);
       console.log("[%s] -----Data from Reputation System-----", self.id);
