@@ -144,12 +144,20 @@ contract Validation {
     addReputationScore(_isSuccessful, _pathToken);
   }
 
-  function getData(uint256 index) public view returns(uint256, string, string) {
-    return (DataArray[index].sessionID, DataArray[index].hashValue, DataArray[index].seed);
+  function getData(uint256 _sessionID) public view returns(uint256, string, string) {
+    for (uint256 i = 0; i < DataArray.length; i++) {
+      if (DataArray[i].sessionID == _sessionID && DataArray[i].sender == msg.sender) {
+        return (DataArray[i].sessionID, DataArray[i].hashValue, DataArray[i].seed);
+      }
+    }
   }
 
-  function getSession(uint256 index) public view returns(uint256, address, string, string, bool) {
-    return (SessionArray[index].id, SessionArray[index].receiver, SessionArray[index].payload, SessionArray[index].pathToken, SessionArray[index].isSuccessful);
+  function getSession(uint256 _sessionID) public view returns(uint256, address, string, string, bool) {
+    for (uint256 i = 0; i < SessionArray.length; i++) {
+      if (SessionArray[i].id == _sessionID) {
+        return (SessionArray[i].id, SessionArray[i].receiver, SessionArray[i].payload, SessionArray[i].pathToken, SessionArray[i].isSuccessful);
+      }
+    }
   }
 
   function addReputationScore(bool _isSuccessful, string _pathToken) public view {

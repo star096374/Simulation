@@ -88,7 +88,7 @@ function Node(options) {
             self.validationSystem.uploadPathToken(message.sessionID, message.pathToken.toString(), {from: self.ethereumAccount, gas: 1000000}).then(function() {
               console.log("[%s] Upload path token to Validation System", self.id);
 
-              self.validationSystem.getSession(0).then(function(result) {
+              self.validationSystem.getSession(message.sessionID).then(function(result) {
                 console.log("[%s] -----Data from Validation System-----", self.id);
                 console.log("[%s] SessionID: %d", self.id, result[0].toNumber());
                 console.log("[%s] Receiver address: %s", self.id, result[1]);
@@ -139,8 +139,7 @@ function Node(options) {
               seed: seed
             });
             self.validationSystem.uploadData(message.sessionID, self.id, hashedPayload, {from: self.ethereumAccount, gas: 1000000}).then(function() {
-              var dataIndex = Number(self.id[4]);
-              self.validationSystem.getData(dataIndex).then(function(result) {
+              self.validationSystem.getData(message.sessionID).then(function(result) {
                 console.log("[%s] -----Data from Validation System-----", self.id);
                 console.log("[%s] SessionID: %d", self.id, result[0].toNumber());
                 console.log("[%s] Hash value: %s", self.id, result[1]);
@@ -234,7 +233,7 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
       self.validationSystem.uploadPathToken(message.sessionID, message.pathToken.toString(), {from: self.ethereumAccount, gas: 1000000}).then(function() {
         console.log("[%s] Upload path token to Validation System", self.id);
 
-        self.validationSystem.getSession(0).then(function(result) {
+        self.validationSystem.getSession(message.sessionID).then(function(result) {
           console.log("[%s] -----Data from Validation System-----", self.id);
           console.log("[%s] SessionID: %d", self.id, result[0].toNumber());
           console.log("[%s] Receiver address: %s", self.id, result[1]);
@@ -272,8 +271,7 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
         seed: seed
       });
       self.validationSystem.uploadData(message.sessionID, self.id, hashedPayload, {from: self.ethereumAccount, gas: 1000000}).then(function() {
-        var dataIndex = Number(self.id[4]);
-        self.validationSystem.getData(dataIndex).then(function(result) {
+        self.validationSystem.getData(message.sessionID).then(function(result) {
           console.log("[%s] -----Data from Validation System-----", self.id);
           console.log("[%s] SessionID: %d", self.id, result[0].toNumber());
           console.log("[%s] Hash value: %s", self.id, result[1]);
@@ -369,7 +367,7 @@ Node.prototype.sendMessageToEntryRelayNode = function(nextNodeID, message) {
 Node.prototype.addSessionToValidationSystem = function(sessionID, receiver, message, payload) {
   var self = this;
   this.validationSystem.addSession(sessionID, receiver, payload, {from: this.ethereumAccount, gas: 1000000}).then(function() {
-    self.validationSystem.getSession(0).then(function(result) {
+    self.validationSystem.getSession(sessionID).then(function(result) {
       console.log("[%s] -----Data from Validation System-----", self.id);
       console.log("[%s] SessionID: %d", self.id, result[0].toNumber());
       console.log("[%s] Receiver address: %s", self.id, result[1]);
@@ -386,8 +384,7 @@ Node.prototype.addSessionToValidationSystem = function(sessionID, receiver, mess
         seed: seed
       });
       self.validationSystem.uploadData(sessionID, self.id, hashedPayload, {from: self.ethereumAccount, gas: 1000000}).then(function() {
-        var dataIndex = Number(self.id[4]);
-        self.validationSystem.getData(dataIndex).then(function(result) {
+        self.validationSystem.getData(sessionID).then(function(result) {
           console.log("[%s] -----Data from Validation System-----", self.id);
           console.log("[%s] SessionID: %d", self.id, result[0].toNumber());
           console.log("[%s] Hash value: %s", self.id, result[1]);
@@ -448,8 +445,7 @@ Node.prototype._addTimeToUploadSeedListener = function(timeToUploadSeed) {
             }
           });
           self.validationSystem.uploadSeed(result.args.sessionID, hash, seed, {from: self.ethereumAccount, gas: 1000000}).then(function() {
-            var dataIndex = Number(self.id[4]);
-            self.validationSystem.getData(dataIndex).then(function(result) {
+            self.validationSystem.getData(result.args.sessionID).then(function(result) {
               console.log("[%s] check whether seed is uploaded to Validation System", self.id);
               console.log("[%s] -----Data from Validation System-----", self.id);
               console.log("[%s] SessionID: %d", self.id, result[0].toNumber());

@@ -158,7 +158,7 @@ function doProofOfBandwidth(sessionID, payload, pathTokenList, dataArray) {
 
   console.log("[checker] Set the result of proof of bandwidth to Validation System");
   validation.setSessionIsSuccessful(sessionID, result, pathTokenList.toString(), {from: checkerEthereumAccount, gas: 1000000}).then(function() {
-    validation.getSession(0).then(function(result) {
+    validation.getSession(sessionID).then(function(result) {
       console.log("[checker] -----Data from Validation System-----");
       console.log("[checker] SessionID: %d", result[0].toNumber());
       console.log("[checker] isSuccessful: %s", result[4].toString());
