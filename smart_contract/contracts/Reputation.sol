@@ -11,22 +11,26 @@ contract Reputation {
   mapping (string => address) addressList;
 
   int256 scoreUnit = 10;
+  // because split() will push the result to the storage ref, you have to remember the original length
+  uint256 lengthOfPathTokenList = 0;
 
   constructor() public {
 
   }
 
   function initReputationScore(string id) public {
-    reputationScore[msg.sender] = 0;
     addressList[id] = msg.sender;
   }
 
-  function addReputationScore(bool _isSuccessful, string _pathToken) public {
+  function addReputationScore(bool _isSuccessful, string _pathToken, address _checker) public {
     if (_isSuccessful == true) {
       string[] storage pathTokenList = _pathToken.split(',');
-      for (uint256 i = 0; i < pathTokenList.length; i++) {
+      for (uint256 i = lengthOfPathTokenList; i < pathTokenList.length; i++) {
         reputationScore[addressList[pathTokenList[i]]] += scoreUnit;
       }
+      lengthOfPathTokenList = pathTokenList.length;
+      // add reputation score of the checker
+      reputationScore[_checker] += scoreUnit;
     }
   }
 

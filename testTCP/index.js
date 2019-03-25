@@ -63,8 +63,11 @@ web3.eth.getAccounts(function(err, accs) {
   setTimeout(getDataForProofOfBandwidth, 10000);
 });
 
+// random session ID
+var sessionID = Math.floor(Math.random() * 10000);
+
 var packet = {
-  sessionID: 1,
+  sessionID: sessionID,
   sender: 'node0',
   receiver: 'node5',
   entryPathFilter: ['node3', 'node4', 'node5'],
@@ -163,6 +166,14 @@ function doProofOfBandwidth(sessionID, payload, pathTokenList, dataArray) {
       console.log("[checker] SessionID: %d", result[0].toNumber());
       console.log("[checker] isSuccessful: %s", result[4].toString());
       console.log("[checker] -----Data End-----");
+      reputation.getReputationScore({from: checkerEthereumAccount}).then(function(result) {
+        console.log("[checker] Get reputation score from Reputation System");
+        console.log("[checker] -----Data from Reputation System-----");
+        console.log("[checker] Reputation score: %d", result.toNumber());
+        console.log("[checker] -----Data End-----");
+      }).catch(function(err) {
+        console.log(err);
+      });
     }).catch(function(err) {
       console.log(err);
     });
@@ -175,7 +186,7 @@ setTimeout(function() {
   console.log("*After 15 secs*");
   var counter = 0;
   for (var i = 0; i < nodesList.length; i++) {
-    nodesList[i].reputationSystem.getReputationScore().then(function(result) {
+    nodesList[i].reputationSystem.getReputationScore({from: nodesList[i].ethereumAccount}).then(function(result) {
       console.log("[%s] Get reputation score from Reputation System", id[counter]);
       console.log("[%s] -----Data from Reputation System-----", id[counter]);
       console.log("[%s] Reputation score: %d", id[counter], result.toNumber());

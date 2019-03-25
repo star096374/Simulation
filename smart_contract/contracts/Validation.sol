@@ -4,7 +4,7 @@ import "solidity-util/lib/Strings.sol";
 
 // a limited definition of the contract we wish to access
 contract ReputationInterface {
-  function addReputationScore(bool, string) public pure {
+  function addReputationScore(bool, string, address) public pure {
 
   }
 }
@@ -141,7 +141,7 @@ contract Validation {
         break;
       }
     }
-    addReputationScore(_isSuccessful, _pathToken);
+    addReputationScore(_isSuccessful, _pathToken, msg.sender);
   }
 
   function getData(uint256 _sessionID) public view returns(uint256, string, string) {
@@ -160,9 +160,9 @@ contract Validation {
     }
   }
 
-  function addReputationScore(bool _isSuccessful, string _pathToken) public view {
+  function addReputationScore(bool _isSuccessful, string _pathToken, address _checker) public view {
     // access contract function located in other contract
-    reputation.addReputationScore(_isSuccessful, _pathToken);
+    reputation.addReputationScore(_isSuccessful, _pathToken, _checker);
   }
 
 }
