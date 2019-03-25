@@ -4,7 +4,7 @@ import "solidity-util/lib/Strings.sol";
 
 // a limited definition of the contract we wish to access
 contract ReputationInterface {
-  function addReputationScore(bool, string, address) public pure {
+  function addReputationScore(bool, string, uint256, address) public pure {
 
   }
 }
@@ -19,6 +19,7 @@ contract Validation {
     uint256 id;
     address receiver;
     string payload;
+    uint256 payloadLength;
     string pathToken;
     bool checkable;
     bool isPending;
@@ -49,8 +50,8 @@ contract Validation {
     reputation = ReputationInterface(_reputationAddress);
   }
 
-  function addSession(uint256 sessionID, address receiver, string payload) public {
-    SessionArray.push(Session(sessionID, receiver, payload, "", false, false, false));
+  function addSession(uint256 sessionID, address receiver, string payload, uint256 payloadLength) public {
+    SessionArray.push(Session(sessionID, receiver, payload, payloadLength, "", false, false, false));
   }
 
   function uploadData(uint256 sessionID, string senderID, string hashValue) public {
@@ -135,13 +136,15 @@ contract Validation {
   }
 
   function setSessionIsSuccessful(uint256 _sessionID, bool _isSuccessful, string _pathToken) public {
+    uint256 _payloadLength;
     for (uint256 i = 0; i < SessionArray.length; i++) {
       if (SessionArray[i].id == _sessionID) {
         SessionArray[i].isSuccessful = _isSuccessful;
+        _payloadLength = SessionArray[i].payloadLength;
         break;
       }
     }
-    addReputationScore(_isSuccessful, _pathToken, msg.sender);
+    addReputationScore(_isSuccessful, _pathToken, _payloadLength, msg.sender);
   }
 
   function getData(uint256 _sessionID) public view returns(uint256, string, string) {
@@ -152,17 +155,17 @@ contract Validation {
     }
   }
 
-  function getSession(uint256 _sessionID) public view returns(uint256, address, string, string, bool) {
+  function getSession(uint256 _sessionID) public view returns(uint256, address, string, uint256, string, bool) {
     for (uint256 i = 0; i < SessionArray.length; i++) {
       if (SessionArray[i].id == _sessionID) {
-        return (SessionArray[i].id, SessionArray[i].receiver, SessionArray[i].payload, SessionArray[i].pathToken, SessionArray[i].isSuccessful);
+        return (SessionArray[i].id, SessionArray[i].receiver, SessionArray[i].payload, SessionArray[i].payloadLength, SessionArray[i].pathToken, SessionArray[i].isSuccessful);
       }
     }
   }
 
-  function addReputationScore(bool _isSuccessful, string _pathToken, address _checker) public view {
+  function addReputationScore(bool _isSuccessful, string _pathToken, uint256 _payloadLength, address _checker) public view {
     // access contract function located in other contract
-    reputation.addReputationScore(_isSuccessful, _pathToken, _checker);
+    reputation.addReputationScore(_isSuccessful, _pathToken, _payloadLength, _checker);
   }
 
 }

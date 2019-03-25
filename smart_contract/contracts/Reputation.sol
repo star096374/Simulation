@@ -10,7 +10,7 @@ contract Reputation {
   // node id => ethereum address
   mapping (string => address) addressList;
 
-  int256 scoreUnit = 10;
+  int256 scoreUnit = 5;
   // because split() will push the result to the storage ref, you have to remember the original length
   uint256 lengthOfPathTokenList = 0;
 
@@ -22,11 +22,11 @@ contract Reputation {
     addressList[id] = msg.sender;
   }
 
-  function addReputationScore(bool _isSuccessful, string _pathToken, address _checker) public {
+  function addReputationScore(bool _isSuccessful, string _pathToken, uint256 _payloadLength, address _checker) public {
     if (_isSuccessful == true) {
       string[] storage pathTokenList = _pathToken.split(',');
       for (uint256 i = lengthOfPathTokenList; i < pathTokenList.length; i++) {
-        reputationScore[addressList[pathTokenList[i]]] += scoreUnit;
+        reputationScore[addressList[pathTokenList[i]]] += (scoreUnit * int256(_payloadLength));
       }
       lengthOfPathTokenList = pathTokenList.length;
       // add reputation score of the checker
