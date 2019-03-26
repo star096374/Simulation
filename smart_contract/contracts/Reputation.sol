@@ -26,11 +26,11 @@ contract Reputation {
     if (_isSuccessful == true) {
       string[] storage pathTokenList = _pathToken.split(',');
       for (uint256 i = lengthOfPathTokenList; i < pathTokenList.length; i++) {
-        reputationScore[addressList[pathTokenList[i]]] += (scoreUnit * int256(_payloadLength));
+        reputationScore[addressList[pathTokenList[i]]] += scoreUnit * int256(_payloadLength);
       }
       lengthOfPathTokenList = pathTokenList.length;
       // add reputation score of the checker
-      reputationScore[_checker] += scoreUnit;
+      reputationScore[_checker] += scoreUnit * int256(_payloadLength / 5);
     }
   }
 
