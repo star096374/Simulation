@@ -4,7 +4,7 @@ import "solidity-util/lib/Strings.sol";
 
 // a limited definition of the contract we wish to access
 contract ReputationInterface {
-  function addReputationScore(bool, string, uint256, address) public pure {
+  function addReputationScore(bool, string, uint256, address, string, bool, string) public pure {
 
   }
 }
@@ -23,7 +23,10 @@ contract Validation {
     string pathToken;
     bool checkable;
     bool isPending;
-    bool isSuccessful;
+    bool transferResult;
+    string transferBreakpoint;
+    bool PoBResult;
+    string PoBBreakpoint;
   }
 
   struct Data {
@@ -51,21 +54,29 @@ contract Validation {
   }
 
   function addSession(uint256 sessionID, address receiver, string payload, uint256 payloadLength) public {
-    SessionArray.push(Session(sessionID, receiver, payload, payloadLength, "", false, false, false));
+    SessionArray.push(Session(sessionID, receiver, payload, payloadLength, "", false, false, false, "", false, ""));
   }
 
   function uploadData(uint256 sessionID, string senderID, string hashValue) public {
     DataArray.push(Data(sessionID, msg.sender, senderID, hashValue, "", false));
   }
 
-  function uploadPathToken(uint256 _sessionID, string _pathToken) public {
+  function uploadPathToken(uint256 _sessionID, string _pathToken, string _transferBreakpoint) public {
+    address _receiver;
     for (uint256 i = 0; i < SessionArray.length; i++) {
       if (SessionArray[i].id == _sessionID) {
         SessionArray[i].pathToken = _pathToken;
+        _receiver = SessionArray[i].receiver;
+        if (_receiver != msg.sender) {
+          SessionArray[i].transferBreakpoint = _transferBreakpoint;
+        }
+        else {
+          SessionArray[i].transferResult = true;
+        }
         break;
       }
     }
-    emit timeToUploadSeed(_sessionID, msg.sender, _pathToken);
+    emit timeToUploadSeed(_sessionID, _receiver, _pathToken);
   }
 
   function uploadSeed(uint256 _sessionID, string _hashValue, string _seed) public {
@@ -135,16 +146,15 @@ contract Validation {
     }
   }
 
-  function setSessionIsSuccessful(uint256 _sessionID, bool _isSuccessful, string _pathToken) public {
-    uint256 _payloadLength;
+  function isProofOfBandwidthSuccessful(uint256 _sessionID, bool _PoBResult, string _pathToken, string _PoBBreakpoint) public {
     for (uint256 i = 0; i < SessionArray.length; i++) {
       if (SessionArray[i].id == _sessionID) {
-        SessionArray[i].isSuccessful = _isSuccessful;
-        _payloadLength = SessionArray[i].payloadLength;
+        SessionArray[i].PoBResult = _PoBResult;
+        SessionArray[i].PoBBreakpoint = _PoBBreakpoint;
+        addReputationScore(SessionArray[i].transferResult, _pathToken, SessionArray[i].payloadLength, msg.sender, SessionArray[i].transferBreakpoint, _PoBResult, _PoBBreakpoint);
         break;
       }
     }
-    addReputationScore(_isSuccessful, _pathToken, _payloadLength, msg.sender);
   }
 
   function getData(uint256 _sessionID) public view returns(uint256, string, string) {
@@ -155,17 +165,17 @@ contract Validation {
     }
   }
 
-  function getSession(uint256 _sessionID) public view returns(uint256, address, string, uint256, string, bool) {
+  function getSession(uint256 _sessionID) public view returns(uint256, address, string, uint256, string, bool, string, bool, string) {
     for (uint256 i = 0; i < SessionArray.length; i++) {
       if (SessionArray[i].id == _sessionID) {
-        return (SessionArray[i].id, SessionArray[i].receiver, SessionArray[i].payload, SessionArray[i].payloadLength, SessionArray[i].pathToken, SessionArray[i].isSuccessful);
+        return (SessionArray[i].id, SessionArray[i].receiver, SessionArray[i].payload, SessionArray[i].payloadLength, SessionArray[i].pathToken, SessionArray[i].transferResult, SessionArray[i].transferBreakpoint, SessionArray[i].PoBResult, SessionArray[i].PoBBreakpoint);
       }
     }
   }
 
-  function addReputationScore(bool _isSuccessful, string _pathToken, uint256 _payloadLength, address _checker) public view {
+  function addReputationScore(bool _transferResult, string _pathToken, uint256 _payloadLength, address _checker, string _transferBreakpoint, bool _PoBResult, string _PoBBreakpoint) public view {
     // access contract function located in other contract
-    reputation.addReputationScore(_isSuccessful, _pathToken, _payloadLength, _checker);
+    reputation.addReputationScore(_transferResult, _pathToken, _payloadLength, _checker, _transferBreakpoint, _PoBResult, _PoBBreakpoint);
   }
 
 }

@@ -22,16 +22,45 @@ contract Reputation {
     addressList[id] = msg.sender;
   }
 
-  function addReputationScore(bool _isSuccessful, string _pathToken, uint256 _payloadLength, address _checker) public {
-    if (_isSuccessful == true) {
-      string[] storage pathTokenList = _pathToken.split(',');
+  function addReputationScore(bool _transferResult, string _pathToken, uint256 _payloadLength, address _checker, string _transferBreakpoint, bool _PoBResult, string _PoBBreakpoint) public {
+    string[] storage pathTokenList = _pathToken.split(',');
+    if (_transferResult == true && _PoBResult == true) {
       for (uint256 i = lengthOfPathTokenList; i < pathTokenList.length; i++) {
         reputationScore[addressList[pathTokenList[i]]] += scoreUnit * int256(_payloadLength);
       }
-      lengthOfPathTokenList = pathTokenList.length;
-      // add reputation score of the checker
-      reputationScore[_checker] += scoreUnit * int256(_payloadLength / 5);
     }
+    else {
+      for (uint256 j = lengthOfPathTokenList; j < pathTokenList.length; j++) {
+        if (_PoBResult == true) {
+          if (j == pathTokenList.length - 1) {
+            reputationScore[addressList[pathTokenList[j]]] -= scoreUnit * int256(_payloadLength);
+            reputationScore[addressList[_transferBreakpoint]] -= scoreUnit * int256(_payloadLength);
+          }
+          else {
+            reputationScore[addressList[pathTokenList[j]]] += scoreUnit * int256(_payloadLength);
+          }
+        }
+        else {
+          if (pathTokenList[lengthOfPathTokenList].compareTo(_PoBBreakpoint) == true) {
+            reputationScore[addressList[_PoBBreakpoint]] -= scoreUnit * int256(_payloadLength);
+            break;
+          }
+          else {
+            if (pathTokenList[j+1].compareTo(_PoBBreakpoint) == true) {
+              reputationScore[addressList[pathTokenList[j]]] -= scoreUnit * int256(_payloadLength);
+              reputationScore[addressList[_PoBBreakpoint]] -= scoreUnit * int256(_payloadLength);
+              break;
+            }
+            else {
+              reputationScore[addressList[pathTokenList[j]]] += scoreUnit * int256(_payloadLength);
+            }
+          }
+        }
+      }
+    }
+    lengthOfPathTokenList = pathTokenList.length;
+    // add reputation score of the checker
+    reputationScore[_checker] += scoreUnit * int256(_payloadLength / 5);
   }
 
   function getReputationScore() public view returns(int256) {

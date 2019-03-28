@@ -36,6 +36,9 @@ var nodesList = [];
 
 var checkerEthereumAccount;
 
+var PoBTime = 30000;
+var checkReputationTime = 35000;
+
 web3.eth.getAccounts(function(err, accs) {
   if (err != null) {
     console.log("There was an error fetching your accounts.");
@@ -60,7 +63,7 @@ web3.eth.getAccounts(function(err, accs) {
   createTopology();
 
   checkerEthereumAccount = accs[6];
-  setTimeout(getDataForProofOfBandwidth, 10000);
+  setTimeout(getDataForProofOfBandwidth, PoBTime);
 });
 
 // random session ID
@@ -93,7 +96,7 @@ function createTopology() {
 }
 
 function getDataForProofOfBandwidth() {
-  console.log("*After 10 secs*");
+  console.log("*After %d secs*", PoBTime / 1000);
   console.log("[checker] Get data for proof of bandwidth");
 
   var sessionID, payload, pathToken;
@@ -140,6 +143,7 @@ function getDataForProofOfBandwidth() {
 function doProofOfBandwidth(sessionID, payload, pathTokenList, dataArray) {
   console.log("[checker] Start to do proof of bandwidth");
   var result = true;
+  var PoBBreakpoint = "";
   for (var i = 0; i < pathTokenList.length-1; i++) {
     var isMatched = false;
     for (var j = 0; j < dataArray.length; j++) {
@@ -155,16 +159,24 @@ function doProofOfBandwidth(sessionID, payload, pathTokenList, dataArray) {
     }
     else {
       result = false;
+      PoBBreakpoint = pathTokenList[i];
       break;
     }
   }
 
   console.log("[checker] Set the result of proof of bandwidth to Validation System");
-  validation.setSessionIsSuccessful(sessionID, result, pathTokenList.toString(), {from: checkerEthereumAccount, gas: 1000000}).then(function() {
+  validation.isProofOfBandwidthSuccessful(sessionID, result, pathTokenList.toString(), PoBBreakpoint, {from: checkerEthereumAccount, gas: 1000000}).then(function() {
     validation.getSession(sessionID, {from: checkerEthereumAccount}).then(function(result) {
       console.log("[checker] -----Data from Validation System-----");
-      console.log("[checker] SessionID: %d", result[0].toNumber());
-      console.log("[checker] isSuccessful: %s", result[5].toString());
+      console.log("[checker] Session ID: %d", result[0].toNumber());
+      console.log("[checker] Transfer result: %s", result[5].toString());
+      if (result[6] != "") {
+        console.log("[checker] Transfer breakpoint: %s", result[6]);
+      }
+      console.log("[checker] PoB result: %s", result[7].toString());
+      if (result[8] != "") {
+        console.log("[checker] PoB breakpoint: %s", result[8]);
+      }
       console.log("[checker] -----Data End-----");
       reputation.getReputationScore({from: checkerEthereumAccount}).then(function(result) {
         console.log("[checker] Get reputation score from Reputation System");
@@ -183,7 +195,7 @@ function doProofOfBandwidth(sessionID, payload, pathTokenList, dataArray) {
 }
 
 setTimeout(function() {
-  console.log("*After 15 secs*");
+  console.log("*After %d secs*", checkReputationTime / 1000);
   var counter = 0;
   for (var i = 0; i < nodesList.length; i++) {
     nodesList[i].reputationSystem.getReputationScore({from: nodesList[i].ethereumAccount}).then(function(result) {
@@ -201,4 +213,4 @@ setTimeout(function() {
       console.log(err);
     });
   }
-}, 15000);
+}, checkReputationTime);
