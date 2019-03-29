@@ -29,15 +29,16 @@ web3.setProvider(new web3.providers.HttpProvider('http://localhost:8545'));
 Validation.setProvider(web3.currentProvider);
 Reputation.setProvider(web3.currentProvider);
 
-var id = ['node0', 'node1', 'node2', 'node3', 'node4', 'node5'];
-var port = [3000, 4000, 5000, 6000, 7000, 8000];
+var nodeID = ['node0', 'node1', 'node2', 'node3', 'node4', 'node5'];
+var nodePort = [3000, 4000, 5000, 6000, 7000, 8000];
+var nodeList = [];
 
-var nodesList = [];
+var checkerID = ['checker0', 'checker1'];
+var checkerPort = [9000, 10000];
+var checkerList = [];
 
-var checkerEthereumAccount;
-
-var PoBTime = 30000;
-var checkReputationTime = 35000;
+var PoBTime = 10000;
+var checkReputationTime = 15000;
 
 web3.eth.getAccounts(function(err, accs) {
   if (err != null) {
@@ -50,9 +51,9 @@ web3.eth.getAccounts(function(err, accs) {
   }
 
   for (var i = 0; i < 6; i++) {
-    nodesList.push(new Node({
-      id: id[i],
-      port: port[i],
+    nodeList.push(new Node({
+      id: nodeID[i],
+      port: nodePort[i],
       host: '127.0.0.1',
       ethereumAccount: accs[i],
       validationSystem: validation,
@@ -60,10 +61,18 @@ web3.eth.getAccounts(function(err, accs) {
     }));
   }
 
-  createTopology();
+  for (var i = 0; i < 2; i++) {
+    checkerList.push(new Node({
+      id: checkerID[i],
+      port: checkerPort[i],
+      host: '127.0.0.1',
+      ethereumAccount: accs[i+6],
+      validationSystem: validation,
+      reputationSystem: reputation
+    }));
+  }
 
-  checkerEthereumAccount = accs[6];
-  setTimeout(getDataForProofOfBandwidth, PoBTime);
+  createTopology();
 });
 
 // random session ID
@@ -81,131 +90,41 @@ var message = Buffer.from(JSON.stringify(packet));
 
 setTimeout(function() {
   console.log("*After 5 secs*");
-  console.log("[%s] Add Session struct to Validation System", nodesList[0].id);
+  console.log("[%s] Add Session struct to Validation System", nodeList[0].id);
 
   var receiverIndex = Number(packet.receiver[4]);
-  nodesList[0].addSessionToValidationSystem(packet.sessionID, nodesList[receiverIndex].ethereumAccount, message, packet.payload);
+  nodeList[0].addSessionToValidationSystem(packet.sessionID, nodeList[receiverIndex].ethereumAccount, message, packet.payload);
 }, 5000);
 
-function createTopology() {
-  nodesList[0].connectToAnotherServer('Exit Relay', '127.0.0.1', port[1]);
-  nodesList[1].connectToAnotherServer('Exit Relay', '127.0.0.1', port[2]);
-  nodesList[2].connectToAnotherServer('Gateway', '127.0.0.1', port[3]);
-  nodesList[4].connectToAnotherServer('Entry Relay', '127.0.0.1', port[3]);
-  nodesList[5].connectToAnotherServer('Entry Relay', '127.0.0.1', port[4]);
-}
-
-function getDataForProofOfBandwidth() {
+setTimeout(function() {
   console.log("*After %d secs*", PoBTime / 1000);
-  console.log("[checker] Get data for proof of bandwidth");
-
-  var sessionID, payload, pathToken;
-  var dataArray = [];
-  var isAllDataCollected = false;
-  validation.requestForCheckingSession().then(function(result) {
-    sessionID = result[0].toNumber();
-    payload = result[1];
-    pathToken = result[2];
-    validation.setSessionIsPending(sessionID, {from: checkerEthereumAccount}).then(function() {
-      var pathTokenList = pathToken.split(',');
-      var counter = 0;
-      for (var i = 0; i < pathTokenList.length-1; i++) {
-        validation.requestForCheckingData(sessionID, pathTokenList[i]).then(function(dataResult) {
-          dataArray.push({
-            sessionID: sessionID,
-            senderID: dataResult[0],
-            hashValue: dataResult[1],
-            seed: dataResult[2]
-          });
-          if (dataArray.length == pathTokenList.length-1) {
-            isAllDataCollected = true;
-          }
-          validation.setDataIsPending(sessionID, pathTokenList[i], {from: checkerEthereumAccount}).then(function() {
-            counter += 1;
-            if (isAllDataCollected == true && counter == dataArray.length) {
-              doProofOfBandwidth(sessionID, payload, pathTokenList, dataArray);
-            }
-          }).catch(function(err) {
-            console.log(err);
-          });
-        }).catch(function(err) {
-          console.log(err);
-        });
-      }
-    }).catch(function(err) {
-      console.log(err);
-    });
-  }).catch(function(err) {
-    console.log(err);
-  });
-}
-
-function doProofOfBandwidth(sessionID, payload, pathTokenList, dataArray) {
-  console.log("[checker] Start to do proof of bandwidth");
-  var result = true;
-  var PoBBreakpoint = "";
-  for (var i = 0; i < pathTokenList.length-1; i++) {
-    var isMatched = false;
-    for (var j = 0; j < dataArray.length; j++) {
-      if (dataArray[j].senderID == pathTokenList[i]) {
-        if (sha256(dataArray[j].seed + payload) == dataArray[j].hashValue) {
-          isMatched = true;
-          break;
-        }
-      }
-    }
-    if (isMatched == true) {
-      continue;
-    }
-    else {
-      result = false;
-      PoBBreakpoint = pathTokenList[i];
-      break;
-    }
-  }
-
-  console.log("[checker] Set the result of proof of bandwidth to Validation System");
-  validation.isProofOfBandwidthSuccessful(sessionID, result, pathTokenList.toString(), PoBBreakpoint, {from: checkerEthereumAccount, gas: 1000000}).then(function() {
-    validation.getSession(sessionID, {from: checkerEthereumAccount}).then(function(result) {
-      console.log("[checker] -----Data from Validation System-----");
-      console.log("[checker] Session ID: %d", result[0].toNumber());
-      console.log("[checker] Transfer result: %s", result[5].toString());
-      if (result[6] != "") {
-        console.log("[checker] Transfer breakpoint: %s", result[6]);
-      }
-      console.log("[checker] PoB result: %s", result[7].toString());
-      if (result[8] != "") {
-        console.log("[checker] PoB breakpoint: %s", result[8]);
-      }
-      console.log("[checker] -----Data End-----");
-      reputation.getReputationScore({from: checkerEthereumAccount}).then(function(result) {
-        console.log("[checker] Get reputation score from Reputation System");
-        console.log("[checker] -----Data from Reputation System-----");
-        console.log("[checker] Reputation score: %d", result.toNumber());
-        console.log("[checker] -----Data End-----");
-      }).catch(function(err) {
-        console.log(err);
-      });
-    }).catch(function(err) {
-      console.log(err);
-    });
-  }).catch(function(err) {
-    console.log(err);
-  });
-}
+  checkerList[0].getDataForProofOfBandwidth();
+}, PoBTime);
 
 setTimeout(function() {
   console.log("*After %d secs*", checkReputationTime / 1000);
+  checkReputationScore();
+}, checkReputationTime);
+
+function createTopology() {
+  nodeList[0].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[1]);
+  nodeList[1].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[2]);
+  nodeList[2].connectToAnotherServer('Gateway', '127.0.0.1', nodePort[3]);
+  nodeList[4].connectToAnotherServer('Entry Relay', '127.0.0.1', nodePort[3]);
+  nodeList[5].connectToAnotherServer('Entry Relay', '127.0.0.1', nodePort[4]);
+}
+
+function checkReputationScore() {
   var counter = 0;
-  for (var i = 0; i < nodesList.length; i++) {
-    nodesList[i].reputationSystem.getReputationScore({from: nodesList[i].ethereumAccount}).then(function(result) {
-      console.log("[%s] Get reputation score from Reputation System", id[counter]);
-      console.log("[%s] -----Data from Reputation System-----", id[counter]);
-      console.log("[%s] Reputation score: %d", id[counter], result.toNumber());
-      console.log("[%s] -----Data End-----", id[counter]);
+  for (var i = 0; i < nodeList.length; i++) {
+    nodeList[i].reputationSystem.getReputationScore({from: nodeList[i].ethereumAccount}).then(function(result) {
+      console.log("[%s] Get reputation score from Reputation System", nodeID[counter]);
+      console.log("[%s] -----Data from Reputation System-----", nodeID[counter]);
+      console.log("[%s] Reputation score: %d", nodeID[counter], result.toNumber());
+      console.log("[%s] -----Data End-----", nodeID[counter]);
 
       counter += 1;
-      if (counter == nodesList.length) {
+      if (counter == nodeList.length) {
         console.log("*Simulation Finish*");
         process.exit(0);
       }
@@ -213,4 +132,4 @@ setTimeout(function() {
       console.log(err);
     });
   }
-}, checkReputationTime);
+}

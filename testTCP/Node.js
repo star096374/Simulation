@@ -594,13 +594,114 @@ Node.prototype._addTimeToUploadSeedListener = function(timeToUploadSeed) {
 
 Node.prototype._registerInReputationSystem = function() {
   var self = this;
-  this.reputationSystem.initReputationScore(self.id, {from: self.ethereumAccount}).then(function() {
+  this.reputationSystem.initReputationScore(this.id, {from: this.ethereumAccount}).then(function() {
     console.log("[%s] Registered in Reputation System", self.id);
     self.reputationSystem.getReputationScore({from: self.ethereumAccount}).then(function(result) {
       console.log("[%s] Get reputation score from Reputation System", self.id);
       console.log("[%s] -----Data from Reputation System-----", self.id);
       console.log("[%s] Reputation score: %d", self.id, result.toNumber());
       console.log("[%s] -----Data End-----", self.id);
+    }).catch(function(err) {
+      console.log(err);
+    });
+  }).catch(function(err) {
+    console.log(err);
+  });
+}
+
+Node.prototype.getDataForProofOfBandwidth = function() {
+  var self = this;
+  console.log("[%s] Get data for proof of bandwidth", this.id);
+
+  var sessionID, payload, pathToken;
+  var dataArray = [];
+  var isAllDataCollected = false;
+  this.validationSystem.requestForCheckingSession({from: this.ethereumAccount}).then(function(result) {
+    sessionID = result[0].toNumber();
+    payload = result[1];
+    pathToken = result[2];
+    self.validationSystem.setSessionIsPending(sessionID, {from: self.ethereumAccount}).then(function() {
+      var pathTokenList = pathToken.split(',');
+      var counter = 0;
+      for (var i = 0; i < pathTokenList.length-1; i++) {
+        self.validationSystem.requestForCheckingData(sessionID, pathTokenList[i], {from: self.ethereumAccount}).then(function(dataResult) {
+          dataArray.push({
+            sessionID: sessionID,
+            senderID: dataResult[0],
+            hashValue: dataResult[1],
+            seed: dataResult[2]
+          });
+          if (dataArray.length == pathTokenList.length-1) {
+            isAllDataCollected = true;
+          }
+          self.validationSystem.setDataIsPending(sessionID, pathTokenList[i], {from: self.ethereumAccount}).then(function() {
+            counter += 1;
+            if (isAllDataCollected == true && counter == dataArray.length) {
+              self._doProofOfBandwidth(sessionID, payload, pathTokenList, dataArray);
+            }
+          }).catch(function(err) {
+            console.log(err);
+          });
+        }).catch(function(err) {
+          console.log(err);
+        });
+      }
+    }).catch(function(err) {
+      console.log(err);
+    });
+  }).catch(function(err) {
+    console.log(err);
+  });
+}
+
+Node.prototype._doProofOfBandwidth = function(sessionID, payload, pathTokenList, dataArray) {
+  var self = this;
+  console.log("[%s] Start to do proof of bandwidth", this.id);
+
+  var result = true;
+  var PoBBreakpoint = "";
+  for (var i = 0; i < pathTokenList.length-1; i++) {
+    var isMatched = false;
+    for (var j = 0; j < dataArray.length; j++) {
+      if (dataArray[j].senderID == pathTokenList[i]) {
+        if (sha256(dataArray[j].seed + payload) == dataArray[j].hashValue) {
+          isMatched = true;
+          break;
+        }
+      }
+    }
+    if (isMatched == true) {
+      continue;
+    }
+    else {
+      result = false;
+      PoBBreakpoint = pathTokenList[i];
+      break;
+    }
+  }
+
+  console.log("[%s] Set the result of proof of bandwidth to Validation System", this.id);
+  this.validationSystem.isProofOfBandwidthSuccessful(sessionID, result, pathTokenList.toString(), PoBBreakpoint, {from: this.ethereumAccount, gas: 1000000}).then(function() {
+    self.validationSystem.getSession(sessionID, {from: self.ethereumAccount}).then(function(result) {
+      console.log("[%s] -----Data from Validation System-----", self.id);
+      console.log("[%s] Session ID: %d", self.id, result[0].toNumber());
+      console.log("[%s] Transfer result: %s", self.id, result[5].toString());
+      if (result[6] != "") {
+        console.log("[%s] Transfer breakpoint: %s", self.id, result[6]);
+      }
+      console.log("[%s] PoB result: %s", self.id, result[7].toString());
+      if (result[8] != "") {
+        console.log("[%s] PoB breakpoint: %s", self.id, result[8]);
+      }
+      console.log("[%s] -----Data End-----", self.id);
+      self.reputationSystem.getReputationScore({from: self.ethereumAccount}).then(function(result) {
+        console.log("[%s] Get reputation score from Reputation System", self.id);
+        console.log("[%s] -----Data from Reputation System-----", self.id);
+        console.log("[%s] Reputation score: %d", self.id, result.toNumber());
+        console.log("[%s] -----Data End-----", self.id);
+      }).catch(function(err) {
+        console.log(err);
+      });
     }).catch(function(err) {
       console.log(err);
     });
