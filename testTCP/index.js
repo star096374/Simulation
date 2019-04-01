@@ -37,8 +37,7 @@ var checkerID = ['checker0', 'checker1'];
 var checkerPort = [9000, 10000];
 var checkerList = [];
 
-var PoBTime = 10000;
-var checkReputationTime = 15000;
+var checkReputationTime = 20000;
 
 web3.eth.getAccounts(function(err, accs) {
   if (err != null) {
@@ -95,11 +94,6 @@ setTimeout(function() {
   var receiverIndex = Number(packet.receiver[4]);
   nodeList[0].addSessionToValidationSystem(packet.sessionID, nodeList[receiverIndex].ethereumAccount, message, packet.payload);
 }, 5000);
-
-setTimeout(function() {
-  console.log("*After %d secs*", PoBTime / 1000);
-  checkerList[0].getDataForProofOfBandwidth();
-}, PoBTime);
 
 setTimeout(function() {
   console.log("*After %d secs*", checkReputationTime / 1000);

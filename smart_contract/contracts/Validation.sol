@@ -14,6 +14,8 @@ contract Validation {
   using Strings for string;
 
   event timeToUploadSeed(uint256 sessionID, address receiver, string pathToken);
+  event competeForPoB(uint256 sessionID);
+  event winPoBCompetition(uint256 sessionID, address winnerOfPoBCompetition);
 
   struct Session {
     uint256 id;
@@ -27,6 +29,7 @@ contract Validation {
     string transferBreakpoint;
     bool PoBResult;
     string PoBBreakpoint;
+    address PoBChecker;
   }
 
   struct Data {
@@ -38,8 +41,16 @@ contract Validation {
     bool isPending;
   }
 
+  // competition for proof of bandwidth
+  struct PoB {
+    uint256 sessionID;
+    address competitor;
+    uint256 randomNumber;
+  }
+
   Session[] SessionArray;
   Data[] DataArray;
+  PoB[] PoBArray;
 
   // notice that the type here is the contract definition itself
   ReputationInterface private reputation;
@@ -54,7 +65,7 @@ contract Validation {
   }
 
   function addSession(uint256 sessionID, address receiver, string payload, uint256 payloadLength) public {
-    SessionArray.push(Session(sessionID, receiver, payload, payloadLength, "", false, false, false, "", false, ""));
+    SessionArray.push(Session(sessionID, receiver, payload, payloadLength, "", false, false, false, "", false, "", 0));
   }
 
   function uploadData(uint256 sessionID, string senderID, string hashValue) public {
@@ -112,10 +123,59 @@ contract Validation {
     }
   }
 
-  function requestForCheckingSession() public view returns(uint256, string, string) {
+  function setSessionCheckable(uint256 _sessionID) public {
     for (uint256 i = 0; i < SessionArray.length; i++) {
-      if (SessionArray[i].checkable == true && SessionArray[i].isPending == false) {
-        return (SessionArray[i].id, SessionArray[i].payload, SessionArray[i].pathToken);
+      if (SessionArray[i].id == _sessionID && SessionArray[i].checkable == false) {
+        SessionArray[i].checkable = true;
+      }
+    }
+    emit competeForPoB(_sessionID);
+  }
+
+  function joinCompetitionForPoB(uint256 _sessionID, uint256 _randomNumber) public {
+    PoBArray.push(PoB(_sessionID, msg.sender, _randomNumber % 100));
+  }
+
+  function decideCheckerOfPoB(uint256 _sessionID) public {
+    uint256 theNumberOfCompetitor = 0;
+    uint256 totalRandomNumber = 0;
+    for (uint256 i = 0; i < PoBArray.length; i++) {
+      if (PoBArray[i].sessionID == _sessionID) {
+        theNumberOfCompetitor++;
+        totalRandomNumber += PoBArray[i].randomNumber;
+      }
+    }
+
+    uint256 sessionArrayIndex;
+    for (uint256 j = 0; j < SessionArray.length; j++) {
+      if (SessionArray[j].id == _sessionID) {
+        sessionArrayIndex = j;
+        break;
+      }
+    }
+
+    uint256 PoBWinner = totalRandomNumber % theNumberOfCompetitor;
+    uint256 counter = 0;
+    for (uint256 k = 0; k < PoBArray.length; k++) {
+      if (PoBArray[k].sessionID == _sessionID) {
+        if (PoBWinner == counter) {
+          SessionArray[sessionArrayIndex].PoBChecker = PoBArray[k].competitor;
+          emit winPoBCompetition(_sessionID, PoBArray[k].competitor);
+          break;
+        }
+        else {
+          counter++;
+        }
+      }
+    }
+  }
+
+  function requestForCheckingSession(uint256 _sessionID) public view returns(string, string) {
+    for (uint256 i = 0; i < SessionArray.length; i++) {
+      if (SessionArray[i].id == _sessionID && SessionArray[i].checkable == true && SessionArray[i].isPending == false) {
+        if (msg.sender == SessionArray[i].PoBChecker) {
+          return (SessionArray[i].payload, SessionArray[i].pathToken);
+        }
       }
     }
   }
@@ -165,10 +225,18 @@ contract Validation {
     }
   }
 
-  function getSession(uint256 _sessionID) public view returns(uint256, address, string, uint256, string, bool, string, bool, string) {
+  function getSession(uint256 _sessionID) public view returns(uint256, address, string, uint256, string, bool, string, bool, string, address) {
     for (uint256 i = 0; i < SessionArray.length; i++) {
       if (SessionArray[i].id == _sessionID) {
-        return (SessionArray[i].id, SessionArray[i].receiver, SessionArray[i].payload, SessionArray[i].payloadLength, SessionArray[i].pathToken, SessionArray[i].transferResult, SessionArray[i].transferBreakpoint, SessionArray[i].PoBResult, SessionArray[i].PoBBreakpoint);
+        return (SessionArray[i].id, SessionArray[i].receiver, SessionArray[i].payload, SessionArray[i].payloadLength, SessionArray[i].pathToken, SessionArray[i].transferResult, SessionArray[i].transferBreakpoint, SessionArray[i].PoBResult, SessionArray[i].PoBBreakpoint, SessionArray[i].PoBChecker);
+      }
+    }
+  }
+
+  function getPoB(uint256 _sessionID) public view returns(uint256, uint256) {
+    for (uint256 i = 0; i < PoBArray.length; i++) {
+      if (PoBArray[i].sessionID == _sessionID && PoBArray[i].competitor == msg.sender) {
+        return (PoBArray[i].sessionID, PoBArray[i].randomNumber);
       }
     }
   }
