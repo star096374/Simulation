@@ -10,9 +10,19 @@ contract Reputation {
   // node id => ethereum address
   mapping (string => address) addressList;
 
-  int256 scoreUnit = 5;
+  int256 scoreUnit = 50;
   // because split() will push the result to the storage ref, you have to remember the original length
   uint256 lengthOfPathTokenList = 0;
+
+  struct transactionStatus {
+    uint256 firstTransactionTime;
+    int256 addedScore;
+  }
+
+  mapping (address => mapping (address => transactionStatus)) reputationStatus;
+
+  int256 maxAddedScore = 1000;
+  uint256 resetDuration = 60;
 
   constructor() public {
 
@@ -24,9 +34,31 @@ contract Reputation {
 
   function addReputationScore(bool _transferResult, string _pathToken, uint256 _payloadLength, address _checker, string _transferBreakpoint, bool _PoBResult, string _PoBBreakpoint) public {
     string[] storage pathTokenList = _pathToken.split(',');
+    address fromNode;
+    address toNode;
+    int256 scoreToAdd;
     if (_transferResult == true && _PoBResult == true) {
-      for (uint256 i = lengthOfPathTokenList; i < pathTokenList.length; i++) {
-        reputationScore[addressList[pathTokenList[i]]] += scoreUnit * int256(_payloadLength);
+      for (uint256 i = lengthOfPathTokenList; i < pathTokenList.length - 1; i++) {
+        fromNode = addressList[pathTokenList[i]];
+        toNode = addressList[pathTokenList[i+1]];
+        if (reputationStatus[fromNode][toNode].firstTransactionTime == 0) {
+          reputationStatus[fromNode][toNode].firstTransactionTime = now;
+        }
+        else if (now - reputationStatus[fromNode][toNode].firstTransactionTime > resetDuration) {
+          reputationStatus[fromNode][toNode].firstTransactionTime = now;
+          reputationStatus[fromNode][toNode].addedScore = 0;
+        }
+
+        scoreToAdd = scoreUnit * int256(_payloadLength);
+        if (reputationStatus[fromNode][toNode].addedScore + scoreToAdd > maxAddedScore) {
+          scoreToAdd = maxAddedScore - reputationStatus[fromNode][toNode].addedScore;
+        }
+
+        reputationScore[fromNode] += scoreToAdd;
+        reputationStatus[fromNode][toNode].addedScore += scoreToAdd;
+        if (i == pathTokenList.length - 2) {
+          reputationScore[toNode] += scoreToAdd;
+        }
       }
     }
     else {
@@ -37,7 +69,23 @@ contract Reputation {
             reputationScore[addressList[_transferBreakpoint]] -= scoreUnit * int256(_payloadLength);
           }
           else {
-            reputationScore[addressList[pathTokenList[j]]] += scoreUnit * int256(_payloadLength);
+            fromNode = addressList[pathTokenList[j]];
+            toNode = addressList[pathTokenList[j+1]];
+            if (reputationStatus[fromNode][toNode].firstTransactionTime == 0) {
+              reputationStatus[fromNode][toNode].firstTransactionTime = now;
+            }
+            else if (now - reputationStatus[fromNode][toNode].firstTransactionTime > resetDuration) {
+              reputationStatus[fromNode][toNode].firstTransactionTime = now;
+              reputationStatus[fromNode][toNode].addedScore = 0;
+            }
+
+            scoreToAdd = scoreUnit * int256(_payloadLength);
+            if (reputationStatus[fromNode][toNode].addedScore + scoreToAdd > maxAddedScore) {
+              scoreToAdd = maxAddedScore - reputationStatus[fromNode][toNode].addedScore;
+            }
+
+            reputationScore[fromNode] += scoreToAdd;
+            reputationStatus[fromNode][toNode].addedScore += scoreToAdd;
           }
         }
         else {
@@ -52,7 +100,23 @@ contract Reputation {
               break;
             }
             else {
-              reputationScore[addressList[pathTokenList[j]]] += scoreUnit * int256(_payloadLength);
+              fromNode = addressList[pathTokenList[j]];
+              toNode = addressList[pathTokenList[j+1]];
+              if (reputationStatus[fromNode][toNode].firstTransactionTime == 0) {
+                reputationStatus[fromNode][toNode].firstTransactionTime = now;
+              }
+              else if (now - reputationStatus[fromNode][toNode].firstTransactionTime > resetDuration) {
+                reputationStatus[fromNode][toNode].firstTransactionTime = now;
+                reputationStatus[fromNode][toNode].addedScore = 0;
+              }
+
+              scoreToAdd = scoreUnit * int256(_payloadLength);
+              if (reputationStatus[fromNode][toNode].addedScore + scoreToAdd > maxAddedScore) {
+                scoreToAdd = maxAddedScore - reputationStatus[fromNode][toNode].addedScore;
+              }
+
+              reputationScore[fromNode] += scoreToAdd;
+              reputationStatus[fromNode][toNode].addedScore += scoreToAdd;
             }
           }
         }

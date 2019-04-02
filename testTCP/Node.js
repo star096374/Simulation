@@ -36,13 +36,11 @@ function Node(options) {
     var timeToUploadSeed = this.validationSystem.timeToUploadSeed({fromBlock: 0, toBlock: 'latest'});
     this._addTimeToUploadSeedListener(timeToUploadSeed);
 
-    var competeForPoB = this.validationSystem.competeForPoB({fromBlock: 0, toBlock: 'latest'});
     if (this.id == "checker0" || this.id == "checker1") {
+      var competeForPoB = this.validationSystem.competeForPoB({fromBlock: 0, toBlock: 'latest'});
       this._addcompeteForPoBListener(competeForPoB);
-    }
 
-    var winPoBCompetition = this.validationSystem.winPoBCompetition({fromBlock: 0, toBlock: 'latest'});
-    if (this.id == "checker0" || this.id == "checker1") {
+      var winPoBCompetition = this.validationSystem.winPoBCompetition({fromBlock: 0, toBlock: 'latest'});
       this._addwinPoBCompetitionListener(winPoBCompetition);
     }
   }
