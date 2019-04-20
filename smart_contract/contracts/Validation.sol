@@ -30,6 +30,8 @@ contract Validation {
     bool PoBResult;
     string PoBBreakpoint;
     address PoBChecker;
+    uint256 sequenceNumber;
+    uint256 theNumberOfPackets;
   }
 
   struct Data {
@@ -39,6 +41,7 @@ contract Validation {
     string hashValue;
     string seed;
     bool isPending;
+    uint256 sequenceNumber;
   }
 
   // competition for proof of bandwidth
@@ -64,18 +67,18 @@ contract Validation {
     reputation = ReputationInterface(_reputationAddress);
   }
 
-  function addSession(uint256 sessionID, address receiver, string payload, uint256 payloadLength) public {
-    SessionArray.push(Session(sessionID, receiver, payload, payloadLength, "", false, false, false, "", false, "", 0));
+  function addSession(uint256 sessionID, address receiver, string payload, uint256 payloadLength, uint256 sequenceNumber, uint256 theNumberOfPackets) public {
+    SessionArray.push(Session(sessionID, receiver, payload, payloadLength, "", false, false, false, "", false, "", 0, sequenceNumber, theNumberOfPackets));
   }
 
-  function uploadData(uint256 sessionID, string senderID, string hashValue) public {
-    DataArray.push(Data(sessionID, msg.sender, senderID, hashValue, "", false));
+  function uploadData(uint256 sessionID, string senderID, string hashValue, uint256 sequenceNumber) public {
+    DataArray.push(Data(sessionID, msg.sender, senderID, hashValue, "", false, sequenceNumber));
   }
 
-  function uploadPathToken(uint256 _sessionID, string _pathToken, string _transferBreakpoint) public {
+  function uploadPathToken(uint256 _sessionID, string _pathToken, string _transferBreakpoint, uint256 _sequenceNumber) public {
     address _receiver;
     for (uint256 i = 0; i < SessionArray.length; i++) {
-      if (SessionArray[i].id == _sessionID) {
+      if (SessionArray[i].id == _sessionID && SessionArray[i].sequenceNumber == _sequenceNumber) {
         SessionArray[i].pathToken = _pathToken;
         _receiver = SessionArray[i].receiver;
         if (_receiver != msg.sender) {
@@ -87,7 +90,7 @@ contract Validation {
         break;
       }
     }
-    emit timeToUploadSeed(_sessionID, _receiver, _pathToken);
+    //emit timeToUploadSeed(_sessionID, _receiver, _pathToken);
   }
 
   function uploadSeed(uint256 _sessionID, string _hashValue, string _seed) public {
@@ -217,18 +220,26 @@ contract Validation {
     }
   }
 
-  function getData(uint256 _sessionID) public view returns(uint256, string, string) {
+  function getData(uint256 _sessionID, uint256 _sequenceNumber) public view returns(uint256, string, string, uint256) {
     for (uint256 i = 0; i < DataArray.length; i++) {
-      if (DataArray[i].sessionID == _sessionID && DataArray[i].sender == msg.sender) {
-        return (DataArray[i].sessionID, DataArray[i].hashValue, DataArray[i].seed);
+      if (DataArray[i].sessionID == _sessionID && DataArray[i].sender == msg.sender && DataArray[i].sequenceNumber == _sequenceNumber) {
+        return (DataArray[i].sessionID, DataArray[i].hashValue, DataArray[i].seed, DataArray[i].sequenceNumber);
       }
     }
   }
 
-  function getSession(uint256 _sessionID) public view returns(uint256, address, string, uint256, string, bool, string, bool, string, address) {
+  function getSessionInformation(uint256 _sessionID, uint256 _sequenceNumber) public view returns(uint256, address, string, uint256, string, uint256, uint256) {
     for (uint256 i = 0; i < SessionArray.length; i++) {
-      if (SessionArray[i].id == _sessionID) {
-        return (SessionArray[i].id, SessionArray[i].receiver, SessionArray[i].payload, SessionArray[i].payloadLength, SessionArray[i].pathToken, SessionArray[i].transferResult, SessionArray[i].transferBreakpoint, SessionArray[i].PoBResult, SessionArray[i].PoBBreakpoint, SessionArray[i].PoBChecker);
+      if (SessionArray[i].id == _sessionID && SessionArray[i].sequenceNumber == _sequenceNumber) {
+        return (SessionArray[i].id, SessionArray[i].receiver, SessionArray[i].payload, SessionArray[i].payloadLength, SessionArray[i].pathToken, SessionArray[i].sequenceNumber, SessionArray[i].theNumberOfPackets);
+      }
+    }
+  }
+
+  function getSessionStatus(uint256 _sessionID, uint256 _sequenceNumber) public view returns(uint256, address, string, bool, uint256, uint256) {
+    for (uint256 i = 0; i < SessionArray.length; i++) {
+      if (SessionArray[i].id == _sessionID && SessionArray[i].sequenceNumber == _sequenceNumber) {
+        return (SessionArray[i].id, SessionArray[i].receiver, SessionArray[i].pathToken, SessionArray[i].transferResult, SessionArray[i].sequenceNumber, SessionArray[i].theNumberOfPackets);
       }
     }
   }

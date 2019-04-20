@@ -77,28 +77,36 @@ web3.eth.getAccounts(function(err, accs) {
 // random session ID
 var sessionID = Math.floor(Math.random() * 10000);
 
-var packet = {
-  sessionID: sessionID,
-  sender: 'node0',
-  receiver: 'node5',
-  entryPathFilter: ['node3', 'node4', 'node5'],
-  pathToken: ['node0'],
-  payload: "test message"
+// store all the packets
+var packetArray = [];
+var theNumberOfPackets = 5;
+
+for (var i = 0; i < theNumberOfPackets; i++) {
+  var packet = {
+    sessionID: sessionID,
+    sender: 'node0',
+    receiver: 'node5',
+    entryPathFilter: ['node3', 'node4', 'node5'],
+    pathToken: ['node0'],
+    payload: "test message" + i,
+    sequenceNumber: i,
+    theNumberOfPackets: theNumberOfPackets
+  }
+  packetArray.push(packet);
 }
-var message = Buffer.from(JSON.stringify(packet));
 
 setTimeout(function() {
   console.log("*After 5 secs*");
   console.log("[%s] Add Session struct to Validation System", nodeList[0].id);
 
-  var receiverIndex = Number(packet.receiver[4]);
-  nodeList[0].addSessionToValidationSystem(packet.sessionID, nodeList[receiverIndex].ethereumAccount, message, packet.payload);
+  var receiverIndex = Number(packetArray[0].receiver[4]);
+  nodeList[0].addSessionToValidationSystem(nodeList[receiverIndex].ethereumAccount, packetArray);
 }, 5000);
 
-setTimeout(function() {
+/*setTimeout(function() {
   console.log("*After %d secs*", checkReputationTime / 1000);
   checkReputationScore();
-}, checkReputationTime);
+}, checkReputationTime);*/
 
 function createTopology() {
   nodeList[0].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[1]);

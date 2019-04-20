@@ -85,23 +85,19 @@ function Node(options) {
         var isJson = true;
         try {
           message = JSON.parse(element);
-          // receive ack, message = session ID
-          if (typeof message == 'number') {
-            isJson = false;
-          }
         } catch (e) {
           isJson = false;
         }
         if (isJson == true) {
           // check whether you have received the packet
-          if (self.receivedPacket.includes(message.sessionID) == true) {
+          if (self.receivedPacket.includes(message.sessionID + ',' + message.sequenceNumber) == true) {
             console.log("[%s] The packet has been received, drop it", self.id);
             return;
           }
           else {
-            self.receivedPacket.push(message.sessionID);
+            self.receivedPacket.push(message.sessionID + ',' + message.sequenceNumber);
             // send ack to sender
-            socket.write(message.sessionID + '\n');
+            socket.write(message.sessionID + ',' + message.sequenceNumber + '\n');
           }
 
           // add node ID to path token of the message
@@ -163,7 +159,9 @@ function Node(options) {
               receiver: message.receiver,
               entryPathFilter: message.entryPathFilter,
               pathToken: message.pathToken,
-              payload: message.payload
+              payload: message.payload,
+              sequenceNumber: message.sequenceNumber,
+              theNumberOfPackets: message.theNumberOfPackets
             }
             var messageWithNewPathToken = Buffer.from(JSON.stringify(packetWithNewPathToken));
 
@@ -183,19 +181,21 @@ function Node(options) {
             });
 
             // hash payload by sha256, and then upload to Validation System
-            console.log("[%s] Upload hashed payload to Validation System", self.id);
             var seed = self._generateRandomString();
             var hashedPayload = sha256(seed + message.payload);
             self.seedArray.push({
               sessionID: message.sessionID,
               hash: hashedPayload,
-              seed: seed
+              seed: seed,
+              sequenceNumber: message.sequenceNumber
             });
-            self.validationSystem.uploadData(message.sessionID, self.id, hashedPayload, {from: self.ethereumAccount, gas: 1000000}).then(function() {
-              self.validationSystem.getData(message.sessionID, {from: self.ethereumAccount}).then(function(result) {
+            self.validationSystem.uploadData(message.sessionID, self.id, hashedPayload, message.sequenceNumber, {from: self.ethereumAccount, gas: 1000000}).then(function() {
+              self.validationSystem.getData(message.sessionID, message.sequenceNumber, {from: self.ethereumAccount}).then(function(result) {
+                console.log("[%s] Hashed payload is uploaded to Validation System", self.id);
                 console.log("[%s] -----Data from Validation System-----", self.id);
                 console.log("[%s] Session ID: %d", self.id, result[0].toNumber());
                 console.log("[%s] Hash value: %s", self.id, result[1]);
+                console.log("[%s] Sequence number: %s", self.id, result[3]);
                 console.log("[%s] -----Data End-----", self.id);
 
                 if (exitRelayNumber > 0) {
@@ -218,7 +218,9 @@ function Node(options) {
                     receiver: message.receiver,
                     entryPathFilter: newEntryPathFilter,
                     pathToken: message.pathToken,
-                    payload: message.payload
+                    payload: message.payload,
+                    sequenceNumber: message.sequenceNumber,
+                    theNumberOfPackets: message.theNumberOfPackets
                   }
                   var newMessage = Buffer.from(JSON.stringify(newPacket));
 
@@ -238,13 +240,12 @@ function Node(options) {
         }
         else {
           element = element.toString().split(',');
-          // receive ack, element = session ID
-          if (element.length == 1) {
-            element = element.toString();
-            console.log("*[%s] Receive ack, session ID: %d*", self.id, element);
+          // receive ack, element = session ID, sequence number
+          if (Number.isInteger(Number(element[1]))) {
+            console.log("*[%s] Receive ack, session ID: %d, sequenceNumber: %d*", self.id,  element[0], element[1]);
             var index = self.retransmitArray.map(function(t) {
-              return t.sessionID.toString();
-            }).indexOf(element);
+              return t.sessionID + ',' + t.sequenceNumber;
+            }).indexOf(element.toString());
             clearInterval(self.retransmitArray[index].intervalID);
             self.retransmitArray.splice(index, 1);
           }
@@ -290,23 +291,19 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
       var isJson = true;
       try {
         message = JSON.parse(element);
-        // receive ack, message = session ID
-        if (typeof message == 'number') {
-          isJson = false;
-        }
       } catch (e) {
         isJson = false;
       }
       if (isJson == true) {
         // check whether you have received the packet
-        if (self.receivedPacket.includes(message.sessionID) == true) {
+        if (self.receivedPacket.includes(message.sessionID + ',' + message.sequenceNumber) == true) {
           console.log("[%s] The packet has been received, drop it", self.id);
           return;
         }
         else {
-          self.receivedPacket.push(message.sessionID);
+          self.receivedPacket.push(message.sessionID + ',' + message.sequenceNumber);
           // send ack to sender
-          socket.write(message.sessionID + '\n');
+          socket.write(message.sessionID + ',' + message.sequenceNumber + '\n');
         }
 
         message.pathToken.push(self.id);
@@ -317,19 +314,24 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
           console.log("[%s] Receiver: %s", self.id, message.receiver);
           console.log("[%s] Path token: %s", self.id, message.pathToken);
           console.log("[%s] Payload: %s", self.id, message.payload);
+          console.log("[%s] Sequence number: %s", self.id, message.sequenceNumber);
+          console.log("[%s] The number of packets: %s", self.id, message.theNumberOfPackets);
           console.log("[%s] -----Message End-----", self.id);
 
           // upload pathToken to Validation System
-          self.validationSystem.uploadPathToken(message.sessionID, message.pathToken.toString(), "", {from: self.ethereumAccount, gas: 1000000}).then(function() {
-            console.log("[%s] Upload path token to Validation System", self.id);
-
-            self.validationSystem.getSession(message.sessionID, {from: self.ethereumAccount}).then(function(result) {
+          self.validationSystem.uploadPathToken(message.sessionID, message.pathToken.toString(), "", message.sequenceNumber, {from: self.ethereumAccount, gas: 1000000}).then(function() {
+            self.validationSystem.getSessionStatus(message.sessionID, message.sequenceNumber, {from: self.ethereumAccount}).then(function(result) {
+              console.log("[%s] Path token is uploaded to Validation System", self.id);
               console.log("[%s] -----Data from Validation System-----", self.id);
               console.log("[%s] Session ID: %d", self.id, result[0].toNumber());
               console.log("[%s] Receiver address: %s", self.id, result[1]);
-              console.log("[%s] Path token: %s", self.id, result[4]);
-              console.log("[%s] Transfer result: %s", self.id, result[5].toString());
+              console.log("[%s] Path token: %s", self.id, result[2]);
+              console.log("[%s] Transfer result: %s", self.id, result[3].toString());
+              console.log("[%s] Sequence number: %d", self.id, result[4]);
+              console.log("[%s] The number of packets: %d", self.id, result[5]);
               console.log("[%s] -----Data End-----", self.id);
+
+              return;
 
               setTimeout(function() {
                 console.log("[%s] Set checkable of the session true", self.id);
@@ -371,24 +373,28 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
             receiver: message.receiver,
             entryPathFilter: newEntryPathFilter,
             pathToken: message.pathToken,
-            payload: message.payload
+            payload: message.payload,
+            sequenceNumber: message.sequenceNumber,
+            theNumberOfPackets: message.theNumberOfPackets
           }
           var newMessage = Buffer.from(JSON.stringify(newPacket));
 
           // hash payload by sha256, and then upload to Validation System
-          console.log("[%s] Upload hashed payload to Validation System", self.id);
           var seed = self._generateRandomString();
           var hashedPayload = sha256(seed + message.payload);
           self.seedArray.push({
             sessionID: message.sessionID,
             hash: hashedPayload,
-            seed: seed
+            seed: seed,
+            sequenceNumber: message.sequenceNumber
           });
-          self.validationSystem.uploadData(message.sessionID, self.id, hashedPayload, {from: self.ethereumAccount, gas: 1000000}).then(function() {
-            self.validationSystem.getData(message.sessionID, {from: self.ethereumAccount}).then(function(result) {
+          self.validationSystem.uploadData(message.sessionID, self.id, hashedPayload, message.sequenceNumber, {from: self.ethereumAccount, gas: 1000000}).then(function() {
+            self.validationSystem.getData(message.sessionID, message.sequenceNumber, {from: self.ethereumAccount}).then(function(result) {
+              console.log("[%s] Hashed payload is uploaded to Validation System", self.id);
               console.log("[%s] -----Data from Validation System-----", self.id);
               console.log("[%s] Session ID: %d", self.id, result[0].toNumber());
               console.log("[%s] Hash value: %s", self.id, result[1]);
+              console.log("[%s] Sequence number: %d", self.id, result[3]);
               console.log("[%s] -----Data End-----", self.id);
 
               console.log("[%s] Forward message to the entry relay node %s", self.id, nextNodeID);
@@ -406,7 +412,8 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
         }
       }
       else {
-        if (isNaN(Number(element)) == true) {
+        element = element.split(',');
+        if (element.length == 1) {
           // element = node ID
           var index = self.socketClient.map(function(t) {
             return t.socket;
@@ -414,11 +421,11 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
           self.socketClient[index].id = element;
         }
         else {
-          // receive ack, element = session ID
-          console.log("*[%s] Receive ack, session ID: %d*", self.id, element);
+          // receive ack, element = session ID, sequence number
+          console.log("*[%s] Receive ack, session ID: %d, sequenceNumber: %d*", self.id,  element[0], element[1]);
           var index = self.retransmitArray.map(function(t) {
-            return t.sessionID.toString();
-          }).indexOf(element);
+            return t.sessionID + ',' + t.sequenceNumber;
+          }).indexOf(element.toString());
           clearInterval(self.retransmitArray[index].intervalID);
           self.retransmitArray.splice(index, 1);
         }
@@ -467,8 +474,8 @@ Node.prototype._sendMessage = function(type, host, port, message) {
   var parsedMessage = JSON.parse(message);
   var retransmitTimer = setInterval(function() {
     var index = self.retransmitArray.map(function(t) {
-      return t.sessionID;
-    }).indexOf(parsedMessage.sessionID);
+      return t.sessionID + ',' + t.sequenceNumber;
+    }).indexOf(parsedMessage.sessionID + ',' + parsedMessage.sequenceNumber);
     self.retransmitArray[index].counter += 1;
     if (self.retransmitArray[index].counter < 3) {
       console.log("[%s] Retransmit the packet, retransmit times: %d", self.id, self.retransmitArray[index].counter);
@@ -525,7 +532,8 @@ Node.prototype._sendMessage = function(type, host, port, message) {
   this.retransmitArray.push({
     sessionID: parsedMessage.sessionID,
     intervalID: retransmitTimer,
-    counter: 0
+    counter: 0,
+    sequenceNumber: parsedMessage.sequenceNumber
   });
 }
 
@@ -565,34 +573,59 @@ Node.prototype.sendMessageToEntryRelayNode = function(nextNodeID, message) {
   });
 }
 
-Node.prototype.addSessionToValidationSystem = function(sessionID, receiver, message, payload) {
+Node.prototype.addSessionToValidationSystem = function(receiver, packetArray) {
   var self = this;
-  this.validationSystem.addSession(sessionID, receiver, payload, payload.length, {from: this.ethereumAccount, gas: 1000000}).then(function() {
-    self.validationSystem.getSession(sessionID, {from: self.ethereumAccount}).then(function(result) {
-      console.log("[%s] -----Data from Validation System-----", self.id);
-      console.log("[%s] Session ID: %d", self.id, result[0].toNumber());
-      console.log("[%s] Receiver address: %s", self.id, result[1]);
-      console.log("[%s] Payload: %s", self.id, result[2]);
-      console.log("[%s] Payload length: %d", self.id, result[3]);
-      console.log("[%s] -----Data End-----", self.id);
 
-      // hash payload by sha256, and then upload to Validation System
-      console.log("[%s] Upload hashed payload to Validation System", self.id);
-      var seed = self._generateRandomString();
-      var hashedPayload = sha256(seed + payload);
-      self.seedArray.push({
-        sessionID: sessionID,
-        hash: hashedPayload,
-        seed: seed
-      });
-      self.validationSystem.uploadData(sessionID, self.id, hashedPayload, {from: self.ethereumAccount, gas: 1000000}).then(function() {
-        self.validationSystem.getData(sessionID, {from: self.ethereumAccount}).then(function(result) {
-          console.log("[%s] -----Data from Validation System-----", self.id);
-          console.log("[%s] Session ID: %d", self.id, result[0].toNumber());
-          console.log("[%s] Hash value: %s", self.id, result[1]);
-          console.log("[%s] -----Data End-----", self.id);
-          console.log("[%s] Start sending message", self.id);
-          self.sendMessageToExitRelayNodes(message);
+  var sessionID = packetArray[0].sessionID;
+  var theNumberOfPackets = packetArray[0].theNumberOfPackets;
+  var sessionCounter = -1;
+  var uploadCounter = -1;
+  var dataCounter = -1;
+  var sendCounter = -1;
+  for (var i = 0; i < theNumberOfPackets; i++) {
+    var payload = packetArray[i].payload;
+    var sequenceNumber = packetArray[i].sequenceNumber;
+    this.validationSystem.addSession(sessionID, receiver, payload, payload.length, sequenceNumber, theNumberOfPackets, {from: this.ethereumAccount, gas: 1000000}).then(function() {
+      sessionCounter++;
+      self.validationSystem.getSessionInformation(sessionID, sessionCounter, {from: self.ethereumAccount}).then(function(result) {
+        console.log("[%s] -----Data from Validation System-----", self.id);
+        console.log("[%s] Session ID: %d", self.id, result[0].toNumber());
+        console.log("[%s] Receiver address: %s", self.id, result[1]);
+        console.log("[%s] Payload: %s", self.id, result[2]);
+        console.log("[%s] Payload length: %d", self.id, result[3]);
+        console.log("[%s] Sequence number: %d", self.id, result[5]);
+        console.log("[%s] The number of packets: %d", self.id, result[6]);
+        console.log("[%s] -----Data End-----", self.id);
+
+        uploadCounter++;
+        var payload = packetArray[uploadCounter].payload;
+        var sequenceNumber = packetArray[uploadCounter].sequenceNumber;
+
+        // hash payload by sha256, and then upload to Validation System
+        var seed = self._generateRandomString();
+        var hashedPayload = sha256(seed + payload);
+        self.seedArray.push({
+          sessionID: sessionID,
+          hash: hashedPayload,
+          seed: seed,
+          sequenceNumber: sequenceNumber
+        });
+        self.validationSystem.uploadData(sessionID, self.id, hashedPayload, sequenceNumber, {from: self.ethereumAccount, gas: 1000000}).then(function() {
+          dataCounter++;
+          self.validationSystem.getData(sessionID, dataCounter, {from: self.ethereumAccount}).then(function(result) {
+            console.log("[%s] Hashed payload is uploaded to Validation System", self.id);
+            console.log("[%s] -----Data from Validation System-----", self.id);
+            console.log("[%s] Session ID: %d", self.id, result[0].toNumber());
+            console.log("[%s] Hash value: %s", self.id, result[1]);
+            console.log("[%s] Sequence Number: %d", self.id, result[3]);
+            console.log("[%s] -----Data End-----", self.id);
+
+            sendCounter++;
+            var message = Buffer.from(JSON.stringify(packetArray[sendCounter]));
+            self.sendMessageToExitRelayNodes(message);
+          }).catch(function(err) {
+            console.log(err);
+          });
         }).catch(function(err) {
           console.log(err);
         });
@@ -602,9 +635,7 @@ Node.prototype.addSessionToValidationSystem = function(sessionID, receiver, mess
     }).catch(function(err) {
       console.log(err);
     });
-  }).catch(function(err) {
-    console.log(err);
-  });
+  }
 }
 
 Node.prototype._generateRandomString = function() {
