@@ -13,9 +13,9 @@ contract Validation {
 
   using Strings for string;
 
-  event timeToUploadSeed(uint256 sessionID, address receiver, string pathToken);
+  event timeToUploadSeed(uint256 sessionID, address receiver, string pathToken, uint256 sequenceNumber);
   event competeForPoB(uint256 sessionID);
-  event winPoBCompetition(uint256 sessionID, address winnerOfPoBCompetition);
+  event winPoBCompetition(uint256 sessionID, address winnerOfPoBCompetition, uint256 theNumberOfPackets);
 
   struct Session {
     uint256 id;
@@ -90,12 +90,12 @@ contract Validation {
         break;
       }
     }
-    //emit timeToUploadSeed(_sessionID, _receiver, _pathToken);
+    emit timeToUploadSeed(_sessionID, _receiver, _pathToken, _sequenceNumber);
   }
 
-  function uploadSeed(uint256 _sessionID, string _hashValue, string _seed) public {
+  function uploadSeed(uint256 _sessionID, string _hashValue, string _seed, uint256 _sequenceNumber) public {
     for (uint256 i = 0; i < DataArray.length; i++) {
-      if (DataArray[i].sessionID == _sessionID) {
+      if (DataArray[i].sessionID == _sessionID && DataArray[i].sequenceNumber == _sequenceNumber) {
         if (DataArray[i].sender == msg.sender) {
           if (DataArray[i].hashValue.compareTo(_hashValue)) {
             DataArray[i].seed = _seed;
@@ -104,35 +104,28 @@ contract Validation {
         }
       }
     }
-
-    bool isAllSeedsUploaded = true;
-    for (uint256 j = 0; j < DataArray.length; j++) {
-      if (DataArray[j].sessionID == _sessionID) {
-        bytes memory temp = bytes(DataArray[j].seed);
-        if (temp.length == 0) {
-          isAllSeedsUploaded = false;
-          break;
-        }
-      }
-    }
-
-    if (isAllSeedsUploaded == true) {
-      for (uint256 k = 0; k < SessionArray.length; k++) {
-        if (SessionArray[k].id == _sessionID) {
-          SessionArray[k].checkable = true;
-          break;
-        }
-      }
-    }
   }
 
-  function setSessionCheckable(uint256 _sessionID) public {
+  function setSessionCheckable(uint256 _sessionID, uint256 _sequenceNumber) public {
     for (uint256 i = 0; i < SessionArray.length; i++) {
-      if (SessionArray[i].id == _sessionID && SessionArray[i].checkable == false) {
+      if (SessionArray[i].id == _sessionID && SessionArray[i].checkable == false && SessionArray[i].sequenceNumber == _sequenceNumber) {
         SessionArray[i].checkable = true;
       }
     }
-    emit competeForPoB(_sessionID);
+
+    bool isAbleToCompeteForPoB = true;
+    for (uint256 j = 0; j < SessionArray.length; j++) {
+      if (SessionArray[j].id == _sessionID) {
+        if (SessionArray[j].checkable == false) {
+          isAbleToCompeteForPoB = false;
+          break;
+        }
+      }
+    }
+
+    if (isAbleToCompeteForPoB == true) {
+      emit competeForPoB(_sessionID);
+    }
   }
 
   function joinCompetitionForPoB(uint256 _sessionID, uint256 _randomNumber) public {
@@ -149,21 +142,13 @@ contract Validation {
       }
     }
 
-    uint256 sessionArrayIndex;
-    for (uint256 j = 0; j < SessionArray.length; j++) {
-      if (SessionArray[j].id == _sessionID) {
-        sessionArrayIndex = j;
-        break;
-      }
-    }
-
     uint256 PoBWinner = totalRandomNumber % theNumberOfCompetitor;
     uint256 counter = 0;
-    for (uint256 k = 0; k < PoBArray.length; k++) {
-      if (PoBArray[k].sessionID == _sessionID) {
+    address _PoBWinnerAddress;
+    for (uint256 j = 0; j < PoBArray.length; j++) {
+      if (PoBArray[j].sessionID == _sessionID) {
         if (PoBWinner == counter) {
-          SessionArray[sessionArrayIndex].PoBChecker = PoBArray[k].competitor;
-          emit winPoBCompetition(_sessionID, PoBArray[k].competitor);
+          _PoBWinnerAddress = PoBArray[j].competitor;
           break;
         }
         else {
@@ -171,47 +156,57 @@ contract Validation {
         }
       }
     }
+
+    uint256 _theNumberOfPackets = 0;
+    for (uint256 k = 0; k < SessionArray.length; k++) {
+      if (SessionArray[k].id == _sessionID) {
+        SessionArray[k].PoBChecker = _PoBWinnerAddress;
+        _theNumberOfPackets++;
+      }
+    }
+
+    emit winPoBCompetition(_sessionID, _PoBWinnerAddress, _theNumberOfPackets);
   }
 
-  function requestForCheckingSession(uint256 _sessionID) public view returns(string, string) {
+  function requestForCheckingSession(uint256 _sessionID, uint256 _sequenceNumber) public view returns(string, string, uint256) {
     for (uint256 i = 0; i < SessionArray.length; i++) {
-      if (SessionArray[i].id == _sessionID && SessionArray[i].checkable == true && SessionArray[i].isPending == false) {
+      if (SessionArray[i].id == _sessionID && SessionArray[i].checkable == true && SessionArray[i].isPending == false && SessionArray[i].sequenceNumber == _sequenceNumber) {
         if (msg.sender == SessionArray[i].PoBChecker) {
-          return (SessionArray[i].payload, SessionArray[i].pathToken);
+          return (SessionArray[i].payload, SessionArray[i].pathToken, SessionArray[i].sequenceNumber);
         }
       }
     }
   }
 
-  function setSessionIsPending(uint256 _sessionID) public {
+  function setSessionIsPending(uint256 _sessionID, uint256 _sequenceNumber) public {
     for (uint256 i = 0; i < SessionArray.length; i++) {
-      if (SessionArray[i].id == _sessionID) {
+      if (SessionArray[i].id == _sessionID && SessionArray[i].sequenceNumber == _sequenceNumber) {
         SessionArray[i].isPending = true;
         break;
       }
     }
   }
 
-  function requestForCheckingData(uint256 _sessionID, string _senderID) public view returns(string, string, string) {
+  function requestForCheckingData(uint256 _sessionID, string _senderID, uint256 _sequenceNumber) public view returns(string, string, string, uint256) {
     for (uint256 i = 0; i < DataArray.length; i++) {
-      if (DataArray[i].sessionID == _sessionID && DataArray[i].senderID.compareTo(_senderID) && DataArray[i].isPending == false) {
-        return (DataArray[i].senderID, DataArray[i].hashValue, DataArray[i].seed);
+      if (DataArray[i].sessionID == _sessionID && DataArray[i].senderID.compareTo(_senderID) && DataArray[i].isPending == false && DataArray[i].sequenceNumber == _sequenceNumber) {
+        return (DataArray[i].senderID, DataArray[i].hashValue, DataArray[i].seed, DataArray[i].sequenceNumber);
       }
     }
   }
 
-  function setDataIsPending(uint256 _sessionID, string _senderID) public {
+  function setDataIsPending(uint256 _sessionID, string _senderID, uint256 _sequenceNumber) public {
     for (uint256 i = 0; i < DataArray.length; i++) {
-      if (DataArray[i].sessionID == _sessionID && DataArray[i].senderID.compareTo(_senderID)) {
+      if (DataArray[i].sessionID == _sessionID && DataArray[i].senderID.compareTo(_senderID) && DataArray[i].sequenceNumber == _sequenceNumber) {
         DataArray[i].isPending = true;
         break;
       }
     }
   }
 
-  function isProofOfBandwidthSuccessful(uint256 _sessionID, bool _PoBResult, string _pathToken, string _PoBBreakpoint) public {
+  function isProofOfBandwidthSuccessful(uint256 _sessionID, bool _PoBResult, string _pathToken, string _PoBBreakpoint, uint256 _sequenceNumber) public {
     for (uint256 i = 0; i < SessionArray.length; i++) {
-      if (SessionArray[i].id == _sessionID) {
+      if (SessionArray[i].id == _sessionID && SessionArray[i].sequenceNumber == _sequenceNumber) {
         SessionArray[i].PoBResult = _PoBResult;
         SessionArray[i].PoBBreakpoint = _PoBBreakpoint;
         addReputationScore(SessionArray[i].transferResult, _pathToken, SessionArray[i].payloadLength, msg.sender, SessionArray[i].transferBreakpoint, _PoBResult, _PoBBreakpoint);
@@ -228,18 +223,18 @@ contract Validation {
     }
   }
 
-  function getSessionInformation(uint256 _sessionID, uint256 _sequenceNumber) public view returns(uint256, address, string, uint256, string, uint256, uint256) {
+  function getSessionInformation(uint256 _sessionID, uint256 _sequenceNumber) public view returns(uint256, address, string, uint256, string, uint256, uint256, address) {
     for (uint256 i = 0; i < SessionArray.length; i++) {
       if (SessionArray[i].id == _sessionID && SessionArray[i].sequenceNumber == _sequenceNumber) {
-        return (SessionArray[i].id, SessionArray[i].receiver, SessionArray[i].payload, SessionArray[i].payloadLength, SessionArray[i].pathToken, SessionArray[i].sequenceNumber, SessionArray[i].theNumberOfPackets);
+        return (SessionArray[i].id, SessionArray[i].receiver, SessionArray[i].payload, SessionArray[i].payloadLength, SessionArray[i].pathToken, SessionArray[i].sequenceNumber, SessionArray[i].theNumberOfPackets, SessionArray[i].PoBChecker);
       }
     }
   }
 
-  function getSessionStatus(uint256 _sessionID, uint256 _sequenceNumber) public view returns(uint256, address, string, bool, uint256, uint256) {
+  function getSessionStatus(uint256 _sessionID, uint256 _sequenceNumber) public view returns(uint256, address, string, bool, uint256, uint256, string, bool, string) {
     for (uint256 i = 0; i < SessionArray.length; i++) {
       if (SessionArray[i].id == _sessionID && SessionArray[i].sequenceNumber == _sequenceNumber) {
-        return (SessionArray[i].id, SessionArray[i].receiver, SessionArray[i].pathToken, SessionArray[i].transferResult, SessionArray[i].sequenceNumber, SessionArray[i].theNumberOfPackets);
+        return (SessionArray[i].id, SessionArray[i].receiver, SessionArray[i].pathToken, SessionArray[i].transferResult, SessionArray[i].sequenceNumber, SessionArray[i].theNumberOfPackets, SessionArray[i].transferBreakpoint, SessionArray[i].PoBResult, SessionArray[i].PoBBreakpoint);
       }
     }
   }

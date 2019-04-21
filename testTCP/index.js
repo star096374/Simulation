@@ -37,7 +37,7 @@ var checkerID = ['checker0', 'checker1'];
 var checkerPort = [9000, 10000];
 var checkerList = [];
 
-var checkReputationTime = 20000;
+var checkReputationTime = 40000;
 
 web3.eth.getAccounts(function(err, accs) {
   if (err != null) {
@@ -103,10 +103,10 @@ setTimeout(function() {
   nodeList[0].addSessionToValidationSystem(nodeList[receiverIndex].ethereumAccount, packetArray);
 }, 5000);
 
-/*setTimeout(function() {
+setTimeout(function() {
   console.log("*After %d secs*", checkReputationTime / 1000);
   checkReputationScore();
-}, checkReputationTime);*/
+}, checkReputationTime);
 
 function createTopology() {
   nodeList[0].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[1]);
