@@ -65,7 +65,7 @@ web3.eth.getAccounts(function(err, accs) {
       id: checkerID[i],
       port: checkerPort[i],
       host: '127.0.0.1',
-      ethereumAccount: accs[i+6],
+      ethereumAccount: accs[i + nodeList.length],
       validationSystem: validation,
       reputationSystem: reputation
     }));

@@ -67,8 +67,12 @@ function Node(options) {
 
   // the array used to save the retransmission status of the packet
   this.retransmitArray = [];
-  // the session ID of the packet you have received
+  // the session ID and sequence number of the packet you have received
+  // [<session ID>, <sequence number>]
   this.receivedPacket = [];
+  // the session ID and sequence number of the ack you have received
+  // [<session ID>, <sequence number>]
+  this.receivedAck = [];
 
   this.server = net.createServer(function(socket) {
     // if someone connect to this server, this function will be triggered
@@ -92,6 +96,8 @@ function Node(options) {
           // check whether you have received the packet
           if (self.receivedPacket.includes(message.sessionID + ',' + message.sequenceNumber) == true) {
             console.log("[%s] The packet has been received, drop it", self.id);
+            // retransmit ack to sender
+            socket.write(message.sessionID + ',' + message.sequenceNumber + '\n');
             return;
           }
           else {
@@ -247,12 +253,19 @@ function Node(options) {
           element = element.toString().split(',');
           // receive ack, element = session ID, sequence number
           if (Number.isInteger(Number(element[1]))) {
-            console.log("*[%s] Receive ack, session ID: %d, sequenceNumber: %d*", self.id,  element[0], element[1]);
-            var index = self.retransmitArray.map(function(t) {
-              return t.sessionID + ',' + t.sequenceNumber;
-            }).indexOf(element.toString());
-            clearInterval(self.retransmitArray[index].intervalID);
-            self.retransmitArray.splice(index, 1);
+            if (self.receivedAck.includes(element[0] + ',' + element[1]) == true) {
+              console.log("*[%s] The ack has been received, drop it*", self.id);
+              return;
+            }
+            else {
+              console.log("*[%s] Receive ack, session ID: %d, sequenceNumber: %d*", self.id,  element[0], element[1]);
+              var index = self.retransmitArray.map(function(t) {
+                return t.sessionID + ',' + t.sequenceNumber;
+              }).indexOf(element.toString());
+              clearInterval(self.retransmitArray[index].intervalID);
+              self.retransmitArray.splice(index, 1);
+              self.receivedAck.push(element[0] + ',' + element[1]);
+            }
           }
           // element = [node ID, relay type]
           else {
@@ -303,6 +316,8 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
         // check whether you have received the packet
         if (self.receivedPacket.includes(message.sessionID + ',' + message.sequenceNumber) == true) {
           console.log("[%s] The packet has been received, drop it", self.id);
+          // retransmit ack to sender
+          socket.write(message.sessionID + ',' + message.sequenceNumber + '\n');
           return;
         }
         else {
@@ -427,12 +442,19 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
         }
         else {
           // receive ack, element = session ID, sequence number
-          console.log("*[%s] Receive ack, session ID: %d, sequenceNumber: %d*", self.id,  element[0], element[1]);
-          var index = self.retransmitArray.map(function(t) {
-            return t.sessionID + ',' + t.sequenceNumber;
-          }).indexOf(element.toString());
-          clearInterval(self.retransmitArray[index].intervalID);
-          self.retransmitArray.splice(index, 1);
+          if (self.receivedAck.includes(element[0] + ',' + element[1]) == true) {
+            console.log("*[%s] The ack has been received, drop it*", self.id);
+            return;
+          }
+          else {
+            console.log("*[%s] Receive ack, session ID: %d, sequenceNumber: %d*", self.id,  element[0], element[1]);
+            var index = self.retransmitArray.map(function(t) {
+              return t.sessionID + ',' + t.sequenceNumber;
+            }).indexOf(element.toString());
+            clearInterval(self.retransmitArray[index].intervalID);
+            self.retransmitArray.splice(index, 1);
+            self.receivedAck.push(element[0] + ',' + element[1]);
+          }
         }
       }
     });
