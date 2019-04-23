@@ -21,7 +21,7 @@ contract Reputation {
 
   mapping (address => mapping (address => transactionStatus)) reputationStatus;
 
-  int256 maxAddedScore = 1000;
+  int256 maxAddedScore = 10000;
   uint256 resetDuration = 60;
 
   constructor() public {
@@ -32,7 +32,7 @@ contract Reputation {
     addressList[id] = msg.sender;
   }
 
-  function addReputationScore(bool _transferResult, string _pathToken, uint256 _payloadLength, address _checker, string _transferBreakpoint, bool _PoBResult, string _PoBBreakpoint) public {
+  function addReputationScore(bool _transferResult, string _pathToken, uint256 _packetLength, address _checker, string _transferBreakpoint, bool _PoBResult, string _PoBBreakpoint) public {
     string[] storage pathTokenList = _pathToken.split(',');
     address fromNode;
     address toNode;
@@ -49,7 +49,7 @@ contract Reputation {
           reputationStatus[fromNode][toNode].addedScore = 0;
         }
 
-        scoreToAdd = scoreUnit * int256(_payloadLength);
+        scoreToAdd = scoreUnit * int256(_packetLength);
         if (reputationStatus[fromNode][toNode].addedScore + scoreToAdd > maxAddedScore) {
           scoreToAdd = maxAddedScore - reputationStatus[fromNode][toNode].addedScore;
         }
@@ -65,8 +65,8 @@ contract Reputation {
       for (uint256 j = lengthOfPathTokenList; j < pathTokenList.length; j++) {
         if (_PoBResult == true) {
           if (j == pathTokenList.length - 1) {
-            reputationScore[addressList[pathTokenList[j]]] -= scoreUnit * int256(_payloadLength);
-            reputationScore[addressList[_transferBreakpoint]] -= scoreUnit * int256(_payloadLength);
+            reputationScore[addressList[pathTokenList[j]]] -= scoreUnit * int256(_packetLength);
+            reputationScore[addressList[_transferBreakpoint]] -= scoreUnit * int256(_packetLength);
           }
           else {
             fromNode = addressList[pathTokenList[j]];
@@ -79,7 +79,7 @@ contract Reputation {
               reputationStatus[fromNode][toNode].addedScore = 0;
             }
 
-            scoreToAdd = scoreUnit * int256(_payloadLength);
+            scoreToAdd = scoreUnit * int256(_packetLength);
             if (reputationStatus[fromNode][toNode].addedScore + scoreToAdd > maxAddedScore) {
               scoreToAdd = maxAddedScore - reputationStatus[fromNode][toNode].addedScore;
             }
@@ -90,13 +90,13 @@ contract Reputation {
         }
         else {
           if (pathTokenList[lengthOfPathTokenList].compareTo(_PoBBreakpoint) == true) {
-            reputationScore[addressList[_PoBBreakpoint]] -= scoreUnit * int256(_payloadLength);
+            reputationScore[addressList[_PoBBreakpoint]] -= scoreUnit * int256(_packetLength);
             break;
           }
           else {
             if (pathTokenList[j+1].compareTo(_PoBBreakpoint) == true) {
-              reputationScore[addressList[pathTokenList[j]]] -= scoreUnit * int256(_payloadLength);
-              reputationScore[addressList[_PoBBreakpoint]] -= scoreUnit * int256(_payloadLength);
+              reputationScore[addressList[pathTokenList[j]]] -= scoreUnit * int256(_packetLength);
+              reputationScore[addressList[_PoBBreakpoint]] -= scoreUnit * int256(_packetLength);
               break;
             }
             else {
@@ -110,7 +110,7 @@ contract Reputation {
                 reputationStatus[fromNode][toNode].addedScore = 0;
               }
 
-              scoreToAdd = scoreUnit * int256(_payloadLength);
+              scoreToAdd = scoreUnit * int256(_packetLength);
               if (reputationStatus[fromNode][toNode].addedScore + scoreToAdd > maxAddedScore) {
                 scoreToAdd = maxAddedScore - reputationStatus[fromNode][toNode].addedScore;
               }
@@ -124,7 +124,7 @@ contract Reputation {
     }
     lengthOfPathTokenList = pathTokenList.length;
     // add reputation score of the checker
-    reputationScore[_checker] += scoreUnit * int256(_payloadLength) / 5;
+    reputationScore[_checker] += int256(_packetLength);
   }
 
   function getReputationScore() public view returns(int256) {

@@ -565,6 +565,13 @@ Node.prototype._sendMessage = function(type, host, port, message) {
     counter: 0,
     sequenceNumber: parsedMessage.sequenceNumber
   });
+
+  // store fromNodeID to seedArray
+  this.seedArray.forEach(function(item) {
+    if (item.sessionID == parsedMessage.sessionID && item.sequenceNumber == parsedMessage.sequenceNumber) {
+      item.toNodeID = socketsList[index].id;
+    }
+  });
 }
 
 Node.prototype.sendMessageToExitRelayNodes = function(message) {
@@ -615,14 +622,15 @@ Node.prototype.addSessionToValidationSystem = function(receiver, packetArray) {
   for (var i = 0; i < theNumberOfPackets; i++) {
     var payload = packetArray[i].payload;
     var sequenceNumber = packetArray[i].sequenceNumber;
-    this.validationSystem.addSession(sessionID, receiver, payload, payload.length, sequenceNumber, theNumberOfPackets, {from: this.ethereumAccount, gas: 1000000}).then(function() {
+    var packetLength = JSON.stringify(packetArray[i]).length;
+    this.validationSystem.addSession(sessionID, receiver, payload, packetLength, sequenceNumber, theNumberOfPackets, {from: this.ethereumAccount, gas: 1000000}).then(function() {
       sessionCounter++;
       self.validationSystem.getSessionInformation(sessionID, sessionCounter, {from: self.ethereumAccount}).then(function(result) {
         console.log("[%s] -----Data from Validation System-----", self.id);
         console.log("[%s] Session ID: %d", self.id, result[0].toNumber());
         console.log("[%s] Receiver address: %s", self.id, result[1]);
         console.log("[%s] Payload: %s", self.id, result[2]);
-        console.log("[%s] Payload length: %d", self.id, result[3]);
+        console.log("[%s] Packet length: %d", self.id, result[3]);
         console.log("[%s] Sequence number: %d", self.id, result[5]);
         console.log("[%s] The number of packets: %d", self.id, result[6]);
         console.log("[%s] -----Data End-----", self.id);
@@ -700,14 +708,15 @@ Node.prototype._addTimeToUploadSeedListener = function(timeToUploadSeed) {
       pathTokenArray.forEach(function(element) {
         if (element == self.id) {
           // according to session ID and sequence number, upload seed to Validation System
-          var hash, seed;
+          var hash, seed, toNodeID;
           self.seedArray.forEach(function(item) {
             if (item.sessionID == result.args.sessionID && item.sequenceNumber == result.args.sequenceNumber) {
               hash = item.hash;
               seed = item.seed;
+              toNodeID = item.toNodeID.toString();
             }
           });
-          self.validationSystem.uploadSeed(result.args.sessionID, hash, seed, result.args.sequenceNumber, {from: self.ethereumAccount, gas: 1000000}).then(function() {
+          self.validationSystem.uploadSeedAndToNodeID(result.args.sessionID, hash, seed, result.args.sequenceNumber, toNodeID, {from: self.ethereumAccount, gas: 1000000}).then(function() {
             self.validationSystem.getData(result.args.sessionID, result.args.sequenceNumber, {from: self.ethereumAccount}).then(function(result) {
               console.log("[%s] Check whether seed is uploaded to Validation System", self.id);
               console.log("[%s] -----Data from Validation System-----", self.id);
@@ -715,6 +724,7 @@ Node.prototype._addTimeToUploadSeedListener = function(timeToUploadSeed) {
               console.log("[%s] Hash value: %s", self.id, result[1]);
               console.log("[%s] Seed: %s", self.id, result[2]);
               console.log("[%s] Sequence number: %d", self.id, result[3]);
+              console.log("[%s] Next node ID: %s", self.id, result[4]);
               console.log("[%s] -----Data End-----", self.id);
             }).catch(function(err) {
               console.log(err);
