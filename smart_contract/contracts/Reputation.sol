@@ -32,7 +32,7 @@ contract Reputation {
     addressList[id] = msg.sender;
   }
 
-  function addReputationScore(bool _transferResult, string _pathToken, uint256 _packetLength, address _checker, string _transferBreakpoint, bool _PoBResult, string _PoBBreakpoint) public {
+  function modifyReputationScore(bool _transferResult, string _pathToken, uint256 _packetLength, address _checker, string _transferBreakpoint, bool _PoBResult, string _PoBBreakpoint) public {
     string[] storage pathTokenList = _pathToken.split(',');
     address fromNode;
     address toNode;
@@ -124,6 +124,12 @@ contract Reputation {
     }
     lengthOfPathTokenList = pathTokenList.length;
     // add reputation score of the checker
+    reputationScore[_checker] += int256(_packetLength);
+  }
+
+  function pathTokenIsInvalid(string _lastFromNodeID, string _lastToNodeID, uint256 _packetLength, address _checker) public {
+    reputationScore[addressList[_lastFromNodeID]] -= scoreUnit * int256(_packetLength);
+    reputationScore[addressList[_lastToNodeID]] -= scoreUnit * int256(_packetLength);
     reputationScore[_checker] += int256(_packetLength);
   }
 

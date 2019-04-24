@@ -4,7 +4,11 @@ import "solidity-util/lib/Strings.sol";
 
 // a limited definition of the contract we wish to access
 contract ReputationInterface {
-  function addReputationScore(bool, string, uint256, address, string, bool, string) public pure {
+  function modifyReputationScore(bool, string, uint256, address, string, bool, string) public pure {
+
+  }
+
+  function pathTokenIsInvalid(string, string, uint256, address) public pure {
 
   }
 }
@@ -16,6 +20,7 @@ contract Validation {
   event timeToUploadSeed(uint256 sessionID, address receiver, string pathToken, uint256 sequenceNumber);
   event competeForPoB(uint256 sessionID);
   event winPoBCompetition(uint256 sessionID, address winnerOfPoBCompetition, uint256 theNumberOfPackets);
+  event PoBisTriggered(uint256 sessionID);
 
   struct Session {
     uint256 id;
@@ -32,6 +37,8 @@ contract Validation {
     address PoBChecker;
     uint256 sequenceNumber;
     uint256 theNumberOfPackets;
+    string senderID;
+    bool isPathTokenInvalid;
   }
 
   struct Data {
@@ -68,12 +75,23 @@ contract Validation {
     reputation = ReputationInterface(_reputationAddress);
   }
 
-  function addSession(uint256 sessionID, address receiver, string payload, uint256 packetLength, uint256 sequenceNumber, uint256 theNumberOfPackets) public {
-    SessionArray.push(Session(sessionID, receiver, payload, packetLength, "", false, false, false, "", false, "", 0, sequenceNumber, theNumberOfPackets));
+  function addSession(uint256 sessionID, address receiver, string payload, uint256 packetLength, uint256 sequenceNumber, uint256 theNumberOfPackets, string senderID) public {
+    SessionArray.push(Session(sessionID, receiver, payload, packetLength, "", false, false, false, "", false, "", 0, sequenceNumber, theNumberOfPackets, senderID, false));
   }
 
   function uploadData(uint256 sessionID, string fromNodeID, string hashValue, uint256 sequenceNumber) public {
     DataArray.push(Data(sessionID, msg.sender, fromNodeID, hashValue, "", false, sequenceNumber, ""));
+  }
+
+  function uploadToNodeID(uint256 _sessionID, uint256 _sequenceNumber, string _toNodeID) public {
+    for (uint256 i = 0; i < DataArray.length; i++) {
+      if (DataArray[i].sessionID == _sessionID && DataArray[i].sequenceNumber == _sequenceNumber) {
+        if (DataArray[i].fromNode == msg.sender) {
+          DataArray[i].toNodeID = _toNodeID;
+          break;
+        }
+      }
+    }
   }
 
   function uploadPathToken(uint256 _sessionID, string _pathToken, string _transferBreakpoint, uint256 _sequenceNumber) public {
@@ -92,15 +110,15 @@ contract Validation {
       }
     }
     emit timeToUploadSeed(_sessionID, _receiver, _pathToken, _sequenceNumber);
+    emit PoBisTriggered(_sessionID);
   }
 
-  function uploadSeedAndToNodeID(uint256 _sessionID, string _hashValue, string _seed, uint256 _sequenceNumber, string _toNodeID) public {
+  function uploadSeed(uint256 _sessionID, string _hashValue, string _seed, uint256 _sequenceNumber) public {
     for (uint256 i = 0; i < DataArray.length; i++) {
       if (DataArray[i].sessionID == _sessionID && DataArray[i].sequenceNumber == _sequenceNumber) {
         if (DataArray[i].fromNode == msg.sender) {
           if (DataArray[i].hashValue.compareTo(_hashValue)) {
             DataArray[i].seed = _seed;
-            DataArray[i].toNodeID = _toNodeID;
             break;
           }
         }
@@ -110,8 +128,13 @@ contract Validation {
 
   function setSessionCheckable(uint256 _sessionID, uint256 _sequenceNumber) public {
     for (uint256 i = 0; i < SessionArray.length; i++) {
-      if (SessionArray[i].id == _sessionID && SessionArray[i].checkable == false && SessionArray[i].sequenceNumber == _sequenceNumber) {
-        SessionArray[i].checkable = true;
+      if (SessionArray[i].id == _sessionID && SessionArray[i].sequenceNumber == _sequenceNumber) {
+        if (SessionArray[i].checkable == false) {
+          SessionArray[i].checkable = true;
+        }
+        else {
+          return;
+        }
       }
     }
 
@@ -170,11 +193,11 @@ contract Validation {
     emit winPoBCompetition(_sessionID, _PoBWinnerAddress, _theNumberOfPackets);
   }
 
-  function requestForCheckingSession(uint256 _sessionID, uint256 _sequenceNumber) public view returns(string, string, uint256) {
+  function requestForCheckingSession(uint256 _sessionID, uint256 _sequenceNumber) public view returns(string, string, uint256, string) {
     for (uint256 i = 0; i < SessionArray.length; i++) {
       if (SessionArray[i].id == _sessionID && SessionArray[i].checkable == true && SessionArray[i].isPending == false && SessionArray[i].sequenceNumber == _sequenceNumber) {
         if (msg.sender == SessionArray[i].PoBChecker) {
-          return (SessionArray[i].payload, SessionArray[i].pathToken, SessionArray[i].sequenceNumber);
+          return (SessionArray[i].payload, SessionArray[i].pathToken, SessionArray[i].sequenceNumber, SessionArray[i].senderID);
         }
       }
     }
@@ -189,10 +212,10 @@ contract Validation {
     }
   }
 
-  function requestForCheckingData(uint256 _sessionID, string _fromNodeID, uint256 _sequenceNumber) public view returns(string, string, string, uint256) {
+  function requestForCheckingData(uint256 _sessionID, string _fromNodeID, uint256 _sequenceNumber) public view returns(string, string, string, uint256, string) {
     for (uint256 i = 0; i < DataArray.length; i++) {
       if (DataArray[i].sessionID == _sessionID && DataArray[i].fromNodeID.compareTo(_fromNodeID) && DataArray[i].isPending == false && DataArray[i].sequenceNumber == _sequenceNumber) {
-        return (DataArray[i].fromNodeID, DataArray[i].hashValue, DataArray[i].seed, DataArray[i].sequenceNumber);
+        return (DataArray[i].fromNodeID, DataArray[i].hashValue, DataArray[i].seed, DataArray[i].sequenceNumber, DataArray[i].toNodeID);
       }
     }
   }
@@ -211,7 +234,18 @@ contract Validation {
       if (SessionArray[i].id == _sessionID && SessionArray[i].sequenceNumber == _sequenceNumber) {
         SessionArray[i].PoBResult = _PoBResult;
         SessionArray[i].PoBBreakpoint = _PoBBreakpoint;
-        addReputationScore(SessionArray[i].transferResult, _pathToken, SessionArray[i].packetLength, msg.sender, SessionArray[i].transferBreakpoint, _PoBResult, _PoBBreakpoint);
+        // access contract function located in other contract
+        reputation.modifyReputationScore(SessionArray[i].transferResult, _pathToken, SessionArray[i].packetLength, msg.sender, SessionArray[i].transferBreakpoint, _PoBResult, _PoBBreakpoint);
+        break;
+      }
+    }
+  }
+
+  function handlePathTokenIsInvalid(uint256 _sessionID, uint256 _sequenceNumber, string _lastFromNodeID, string _lastToNodeID) public {
+    for (uint256 i = 0; i < SessionArray.length; i++) {
+      if (SessionArray[i].id == _sessionID && SessionArray[i].sequenceNumber == _sequenceNumber) {
+        SessionArray[i].isPathTokenInvalid = true;
+        reputation.pathTokenIsInvalid(_lastFromNodeID, _lastToNodeID, SessionArray[i].packetLength, msg.sender);
         break;
       }
     }
@@ -225,10 +259,10 @@ contract Validation {
     }
   }
 
-  function getSessionInformation(uint256 _sessionID, uint256 _sequenceNumber) public view returns(uint256, address, string, uint256, string, uint256, uint256, address) {
+  function getSessionInformation(uint256 _sessionID, uint256 _sequenceNumber) public view returns(uint256, address, string, uint256, string, uint256, uint256, address, string) {
     for (uint256 i = 0; i < SessionArray.length; i++) {
       if (SessionArray[i].id == _sessionID && SessionArray[i].sequenceNumber == _sequenceNumber) {
-        return (SessionArray[i].id, SessionArray[i].receiver, SessionArray[i].payload, SessionArray[i].packetLength, SessionArray[i].pathToken, SessionArray[i].sequenceNumber, SessionArray[i].theNumberOfPackets, SessionArray[i].PoBChecker);
+        return (SessionArray[i].id, SessionArray[i].receiver, SessionArray[i].payload, SessionArray[i].packetLength, SessionArray[i].pathToken, SessionArray[i].sequenceNumber, SessionArray[i].theNumberOfPackets, SessionArray[i].PoBChecker, SessionArray[i].senderID);
       }
     }
   }
@@ -248,10 +282,4 @@ contract Validation {
       }
     }
   }
-
-  function addReputationScore(bool _transferResult, string _pathToken, uint256 _packetLength, address _checker, string _transferBreakpoint, bool _PoBResult, string _PoBBreakpoint) public view {
-    // access contract function located in other contract
-    reputation.addReputationScore(_transferResult, _pathToken, _packetLength, _checker, _transferBreakpoint, _PoBResult, _PoBBreakpoint);
-  }
-
 }

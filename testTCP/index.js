@@ -37,7 +37,7 @@ var checkerID = ['checker0', 'checker1'];
 var checkerPort = [9000, 10000];
 var checkerList = [];
 
-var checkReputationTime = 40000;
+var checkReputationTime = 45000;
 
 web3.eth.getAccounts(function(err, accs) {
   if (err != null) {

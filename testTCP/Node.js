@@ -74,6 +74,9 @@ function Node(options) {
   // [<session ID>, <sequence number>]
   this.receivedAck = [];
 
+  // if proof of bandwidth is not triggered for a long time, sender will trigger it
+  this.isPoBTriggered = [];
+
   this.server = net.createServer(function(socket) {
     // if someone connect to this server, this function will be triggered
     console.log("[%s] A client %s:%d connect to the server", self.id, socket.remoteAddress, socket.remotePort);
@@ -566,11 +569,20 @@ Node.prototype._sendMessage = function(type, host, port, message) {
     sequenceNumber: parsedMessage.sequenceNumber
   });
 
-  // store fromNodeID to seedArray
-  this.seedArray.forEach(function(item) {
-    if (item.sessionID == parsedMessage.sessionID && item.sequenceNumber == parsedMessage.sequenceNumber) {
-      item.toNodeID = socketsList[index].id;
-    }
+  // upload toNodeID to Validation System
+  this.validationSystem.uploadToNodeID(parsedMessage.sessionID, parsedMessage.sequenceNumber, socketsList[index].id.toString(), {from: this.ethereumAccount, gas: 1000000}).then(function() {
+    self.validationSystem.getData(parsedMessage.sessionID, parsedMessage.sequenceNumber, {from: self.ethereumAccount}).then(function(result) {
+      console.log("[%s] Check whether toNodeID is uploaded to Validation System", self.id);
+      console.log("[%s] -----Data from Validation System-----", self.id);
+      console.log("[%s] Session ID: %d", self.id, result[0].toNumber());
+      console.log("[%s] Sequence number: %d", self.id, result[3]);
+      console.log("[%s] Next node ID: %s", self.id, result[4]);
+      console.log("[%s] -----Data End-----", self.id);
+    }).catch(function(err) {
+      console.log(err);
+    });
+  }).catch(function(err) {
+    console.log(err);
   });
 }
 
@@ -623,7 +635,7 @@ Node.prototype.addSessionToValidationSystem = function(receiver, packetArray) {
     var payload = packetArray[i].payload;
     var sequenceNumber = packetArray[i].sequenceNumber;
     var packetLength = JSON.stringify(packetArray[i]).length;
-    this.validationSystem.addSession(sessionID, receiver, payload, packetLength, sequenceNumber, theNumberOfPackets, {from: this.ethereumAccount, gas: 1000000}).then(function() {
+    this.validationSystem.addSession(sessionID, receiver, payload, packetLength, sequenceNumber, theNumberOfPackets, self.id, {from: this.ethereumAccount, gas: 1000000}).then(function() {
       sessionCounter++;
       self.validationSystem.getSessionInformation(sessionID, sessionCounter, {from: self.ethereumAccount}).then(function(result) {
         console.log("[%s] -----Data from Validation System-----", self.id);
@@ -633,6 +645,7 @@ Node.prototype.addSessionToValidationSystem = function(receiver, packetArray) {
         console.log("[%s] Packet length: %d", self.id, result[3]);
         console.log("[%s] Sequence number: %d", self.id, result[5]);
         console.log("[%s] The number of packets: %d", self.id, result[6]);
+        console.log("[%s] Sender ID: %s", self.id, result[8]);
         console.log("[%s] -----Data End-----", self.id);
 
         uploadCounter++;
@@ -648,6 +661,7 @@ Node.prototype.addSessionToValidationSystem = function(receiver, packetArray) {
           seed: seed,
           sequenceNumber: sequenceNumber
         });
+
         self.validationSystem.uploadData(sessionID, self.id, hashedPayload, sequenceNumber, {from: self.ethereumAccount, gas: 1000000}).then(function() {
           dataCounter++;
           self.validationSystem.getData(sessionID, dataCounter, {from: self.ethereumAccount}).then(function(result) {
@@ -673,6 +687,40 @@ Node.prototype.addSessionToValidationSystem = function(receiver, packetArray) {
     }).catch(function(err) {
       console.log(err);
     });
+
+    if (i == 0) {
+      var triggerPoBTimer = setTimeout(function() {
+        console.log("[%s] Trigger proof of bandwidth, sessionID: %d", self.id, sessionID);
+        for (var j = 0; j < theNumberOfPackets; j++) {
+          self.validationSystem.setSessionCheckable(sessionID, j, {from: self.ethereumAccount}).catch(function(err) {
+            console.log(err);
+          });
+        }
+        setTimeout(function() {
+          console.log("[%s] Decide the checker of proof of bandwidth", self.id);
+          self.validationSystem.decideCheckerOfPoB(sessionID, {from: self.ethereumAccount, gas: 1000000}).then(function() {
+            self.validationSystem.getSessionInformation(sessionID, 0, {from: self.ethereumAccount}).then(function(result) {
+              console.log("[%s] -----Data from Validation System-----", self.id);
+              console.log("[%s] Session ID: %d", self.id, result[0].toNumber());
+              console.log("[%s] PoBChecker address: %s", self.id, result[7].toString());
+              console.log("[%s] -----Data End-----", self.id);
+            }).catch(function(err) {
+              console.log(err);
+            });
+          }).catch(function(err) {
+            console.log(err);
+          });
+        }, 5000);
+      }, 60000);
+
+      self.isPoBTriggered.push({
+        sessionID: sessionID,
+        triggerPoBTimer: triggerPoBTimer
+      });
+
+      var PoBisTriggered = self.validationSystem.PoBisTriggered({fromBlock: 0, toBlock: 'latest'});
+      this._addPoBisTriggeredListener(PoBisTriggered);
+    }
   }
 }
 
@@ -708,15 +756,14 @@ Node.prototype._addTimeToUploadSeedListener = function(timeToUploadSeed) {
       pathTokenArray.forEach(function(element) {
         if (element == self.id) {
           // according to session ID and sequence number, upload seed to Validation System
-          var hash, seed, toNodeID;
+          var hash, seed;
           self.seedArray.forEach(function(item) {
             if (item.sessionID == result.args.sessionID && item.sequenceNumber == result.args.sequenceNumber) {
               hash = item.hash;
               seed = item.seed;
-              toNodeID = item.toNodeID.toString();
             }
           });
-          self.validationSystem.uploadSeedAndToNodeID(result.args.sessionID, hash, seed, result.args.sequenceNumber, toNodeID, {from: self.ethereumAccount, gas: 1000000}).then(function() {
+          self.validationSystem.uploadSeed(result.args.sessionID, hash, seed, result.args.sequenceNumber, {from: self.ethereumAccount, gas: 1000000}).then(function() {
             self.validationSystem.getData(result.args.sessionID, result.args.sequenceNumber, {from: self.ethereumAccount}).then(function(result) {
               console.log("[%s] Check whether seed is uploaded to Validation System", self.id);
               console.log("[%s] -----Data from Validation System-----", self.id);
@@ -724,7 +771,6 @@ Node.prototype._addTimeToUploadSeedListener = function(timeToUploadSeed) {
               console.log("[%s] Hash value: %s", self.id, result[1]);
               console.log("[%s] Seed: %s", self.id, result[2]);
               console.log("[%s] Sequence number: %d", self.id, result[3]);
-              console.log("[%s] Next node ID: %s", self.id, result[4]);
               console.log("[%s] -----Data End-----", self.id);
             }).catch(function(err) {
               console.log(err);
@@ -822,7 +868,8 @@ Node.prototype.getDataForProofOfBandwidth = function(sessionID, theNumberOfPacke
       sessionArray.push({
         payload: result[0],
         pathToken: result[1],
-        sequenceNumber: result[2].toNumber()
+        sequenceNumber: result[2].toNumber(),
+        senderID: result[3]
       });
       self.validationSystem.setSessionIsPending(sessionID, result[2], {from: self.ethereumAccount}).then(function() {
         sessionCounter++;
@@ -835,10 +882,11 @@ Node.prototype.getDataForProofOfBandwidth = function(sessionID, theNumberOfPacke
             for (var j = 0; j < pathTokenList.length-1; j++) {
               self.validationSystem.requestForCheckingData(sessionID, pathTokenList[j], element.sequenceNumber, {from: self.ethereumAccount}).then(function(dataResult) {
                 dataArray.push({
-                  senderID: dataResult[0],
+                  fromNodeID: dataResult[0],
                   hashValue: dataResult[1],
                   seed: dataResult[2],
-                  sequenceNumber: dataResult[3].toNumber()
+                  sequenceNumber: dataResult[3].toNumber(),
+                  toNodeID: dataResult[4]
                 });
                 self.validationSystem.setDataIsPending(sessionID, dataResult[0], dataResult[3], {from: self.ethereumAccount, gas: 1000000}).then(function() {
                   dataCounter++;
@@ -876,7 +924,7 @@ Node.prototype._doProofOfBandwidth = function(sessionID, theNumberOfPackets, ses
     for (var j = 0; j < pathTokenList.length-1; j++) {
       var isMatched = false;
       for (var k = 0; k < dataArray.length; k++) {
-        if (dataArray[k].sequenceNumber == sessionArray[i].sequenceNumber && dataArray[k].senderID == pathTokenList[j]) {
+        if (dataArray[k].sequenceNumber == sessionArray[i].sequenceNumber && dataArray[k].fromNodeID == pathTokenList[j]) {
           if (sha256(dataArray[k].seed + sessionArray[i].payload) == dataArray[k].hashValue) {
             isMatched = true;
             break;
@@ -891,6 +939,29 @@ Node.prototype._doProofOfBandwidth = function(sessionID, theNumberOfPackets, ses
         PoBBreakpoint = pathTokenList[j];
         break;
       }
+    }
+
+    // check whether path token is invalid
+    if (sessionArray[i].pathToken == "") {
+      var lastFromNodeID = "";
+      var lastToNodeID = "";
+      var fromNodeID = sessionArray[i].senderID;
+      var toNodeID = "";
+      for (var j = 0; j < dataArray.length; j++) {
+        if (sessionArray[i].sequenceNumber == dataArray[j].sequenceNumber && dataArray[j].fromNodeID == fromNodeID) {
+          toNodeID = dataArray[j].toNodeID;
+          lastFromNodeID = fromNodeID;
+          lastToNodeID = toNodeID;
+          fromNodeID = toNodeID;
+          j = 0;
+        }
+      }
+
+      console.log("[%s] Path token is invalid, sessionID: %d, sequenceNumber: %d", self.id, sessionID, sessionArray[i].sequenceNumber);
+      this.validationSystem.handlePathTokenIsInvalid(sessionID, sessionArray[i].sequenceNumber, lastFromNodeID, lastToNodeID, {from: this.ethereumAccount, gas: 1000000}).catch(function(err) {
+        console.log(err);
+      });
+      continue;
     }
 
     console.log("[%s] Set the result of proof of bandwidth to Validation System", this.id);
@@ -929,6 +1000,27 @@ Node.prototype._doProofOfBandwidth = function(sessionID, theNumberOfPackets, ses
       console.log(err);
     });
   }
+}
+
+Node.prototype._addPoBisTriggeredListener = function(PoBisTriggered) {
+  var self = this;
+  PoBisTriggered.watch(function(error, result) {
+    if (!error) {
+      /*console.log("[%s] Event PoBisTriggered is triggered", self.id);
+      console.log("[%s] -----Data from Validation System-----", self.id);
+      console.log("[%s] Session ID: %d", self.id, result.args.sessionID);
+      console.log("[%s] -----Data End-----", self.id);*/
+
+      self.isPoBTriggered.forEach(function(element) {
+        if (element.sessionID == result.args.sessionID) {
+          clearTimeout(element.triggerPoBTimer);
+        }
+      });
+    }
+    else {
+      console.log(error);
+    }
+  });
 }
 
 module.exports = Node;
