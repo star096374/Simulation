@@ -37,6 +37,7 @@ contract Validation {
     address PoBChecker;
     uint256 sequenceNumber;
     uint256 theNumberOfPackets;
+    address sender;
     string senderID;
     bool isPathTokenInvalid;
   }
@@ -50,6 +51,7 @@ contract Validation {
     bool isPending;
     uint256 sequenceNumber;
     string toNodeID;
+    uint256 counterOfTheSameSessionIDAndSequenceNumber;
   }
 
   // competition for proof of bandwidth
@@ -76,11 +78,17 @@ contract Validation {
   }
 
   function addSession(uint256 sessionID, address receiver, string payload, uint256 packetLength, uint256 sequenceNumber, uint256 theNumberOfPackets, string senderID) public {
-    SessionArray.push(Session(sessionID, receiver, payload, packetLength, "", false, false, false, "", false, "", 0, sequenceNumber, theNumberOfPackets, senderID, false));
+    SessionArray.push(Session(sessionID, receiver, payload, packetLength, "", false, false, false, "", false, "", 0, sequenceNumber, theNumberOfPackets, msg.sender, senderID, false));
   }
 
   function uploadData(uint256 sessionID, string fromNodeID, string hashValue, uint256 sequenceNumber) public {
-    DataArray.push(Data(sessionID, msg.sender, fromNodeID, hashValue, "", false, sequenceNumber, ""));
+    uint256 _counter = 0;
+    for (uint256 i = 0; i < DataArray.length; i++) {
+      if (DataArray[i].sessionID == sessionID && DataArray[i].sequenceNumber == sequenceNumber) {
+        _counter++;
+      }
+    }
+    DataArray.push(Data(sessionID, msg.sender, fromNodeID, hashValue, "", false, sequenceNumber, "", _counter));
   }
 
   function uploadToNodeID(uint256 _sessionID, uint256 _sequenceNumber, string _toNodeID) public {
@@ -110,7 +118,6 @@ contract Validation {
       }
     }
     emit timeToUploadSeed(_sessionID, _receiver, _pathToken, _sequenceNumber);
-    emit PoBisTriggered(_sessionID);
   }
 
   function uploadSeed(uint256 _sessionID, string _hashValue, string _seed, uint256 _sequenceNumber) public {
@@ -150,6 +157,14 @@ contract Validation {
 
     if (isAbleToCompeteForPoB == true) {
       emit competeForPoB(_sessionID);
+      for (uint256 k = 0; k < SessionArray.length; k++) {
+        if (SessionArray[k].id == _sessionID) {
+          if (SessionArray[k].sender != msg.sender) {
+            emit PoBisTriggered(_sessionID);
+          }
+          break;
+        }
+      }
     }
   }
 
@@ -193,11 +208,11 @@ contract Validation {
     emit winPoBCompetition(_sessionID, _PoBWinnerAddress, _theNumberOfPackets);
   }
 
-  function requestForCheckingSession(uint256 _sessionID, uint256 _sequenceNumber) public view returns(string, string, uint256, string) {
+  function requestForCheckingSession(uint256 _sessionID, uint256 _sequenceNumber) public view returns(string, string, uint256, string, bool) {
     for (uint256 i = 0; i < SessionArray.length; i++) {
       if (SessionArray[i].id == _sessionID && SessionArray[i].checkable == true && SessionArray[i].isPending == false && SessionArray[i].sequenceNumber == _sequenceNumber) {
         if (msg.sender == SessionArray[i].PoBChecker) {
-          return (SessionArray[i].payload, SessionArray[i].pathToken, SessionArray[i].sequenceNumber, SessionArray[i].senderID);
+          return (SessionArray[i].payload, SessionArray[i].pathToken, SessionArray[i].sequenceNumber, SessionArray[i].senderID, SessionArray[i].transferResult);
         }
       }
     }
@@ -212,10 +227,40 @@ contract Validation {
     }
   }
 
+  function getTheNumberOfData(uint256 _sessionID) public view returns(uint256) {
+    uint256 _counter = 0;
+    for (uint256 i = 0; i < DataArray.length; i++) {
+      if (DataArray[i].sessionID == _sessionID) {
+        _counter++;
+      }
+    }
+    return (_counter);
+  }
+
   function requestForCheckingData(uint256 _sessionID, string _fromNodeID, uint256 _sequenceNumber) public view returns(string, string, string, uint256, string) {
     for (uint256 i = 0; i < DataArray.length; i++) {
       if (DataArray[i].sessionID == _sessionID && DataArray[i].fromNodeID.compareTo(_fromNodeID) && DataArray[i].isPending == false && DataArray[i].sequenceNumber == _sequenceNumber) {
         return (DataArray[i].fromNodeID, DataArray[i].hashValue, DataArray[i].seed, DataArray[i].sequenceNumber, DataArray[i].toNodeID);
+      }
+    }
+  }
+
+  function getDataArrayLength(uint256 _sessionID, uint256 _sequenceNumber) public view returns(uint256) {
+    uint256 _counter = 0;
+    for (uint256 i = 0; i < DataArray.length; i++) {
+      if (DataArray[i].sessionID == _sessionID && DataArray[i].sequenceNumber == _sequenceNumber) {
+        _counter++;
+      }
+    }
+    return (_counter);
+  }
+
+  function requestForCheckingDataWithoutFromNodeID(uint256 _sessionID, uint256 _sequenceNumber, uint256 _counterOfTheSameSessionIDAndSequenceNumber) public view returns(string, string, string, uint256, string) {
+    for (uint256 i = 0; i < DataArray.length; i++) {
+      if (DataArray[i].sessionID == _sessionID && DataArray[i].isPending == false && DataArray[i].sequenceNumber == _sequenceNumber) {
+        if (DataArray[i].counterOfTheSameSessionIDAndSequenceNumber == _counterOfTheSameSessionIDAndSequenceNumber) {
+          return (DataArray[i].fromNodeID, DataArray[i].hashValue, DataArray[i].seed, DataArray[i].sequenceNumber, DataArray[i].toNodeID);
+        }
       }
     }
   }

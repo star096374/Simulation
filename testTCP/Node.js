@@ -77,6 +77,11 @@ function Node(options) {
   // if proof of bandwidth is not triggered for a long time, sender will trigger it
   this.isPoBTriggered = [];
 
+  // store the number of the uploaded pathToken of the session
+  this.uploadedPathTokenNumber = {};
+  // whether the PoBChecker is decided
+  this.isPoBCheckerDecided = {};
+
   this.server = net.createServer(function(socket) {
     // if someone connect to this server, this function will be triggered
     console.log("[%s] A client %s:%d connect to the server", self.id, socket.remoteAddress, socket.remotePort);
@@ -124,6 +129,13 @@ function Node(options) {
 
             // upload pathToken to Validation System
             self.validationSystem.uploadPathToken(message.sessionID, message.pathToken.toString(), "", message.sequenceNumber, {from: self.ethereumAccount, gas: 1000000}).then(function() {
+              if (self.uploadedPathTokenNumber[message.sessionID] !== undefined) {
+                self.uploadedPathTokenNumber[message.sessionID]++;
+              }
+              else {
+                self.uploadedPathTokenNumber[message.sessionID] = 1;
+                self.isPoBCheckerDecided[message.sessionID] = false;
+              }
               self.validationSystem.getSessionStatus(message.sessionID, message.sequenceNumber, {from: self.ethereumAccount}).then(function(result) {
                 console.log("[%s] Path token is uploaded to Validation System", self.id);
                 console.log("[%s] -----Data from Validation System-----", self.id);
@@ -141,7 +153,8 @@ function Node(options) {
                     console.log(err);
                   });
 
-                  if (message.sequenceNumber == 0) {
+                  if (self.uploadedPathTokenNumber[message.sessionID] == message.theNumberOfPackets && self.isPoBCheckerDecided[message.sessionID] == false) {
+                    self.isPoBCheckerDecided[message.sessionID] = true;
                     setTimeout(function() {
                       console.log("[%s] Decide the checker of proof of bandwidth", self.id);
                       self.validationSystem.decideCheckerOfPoB(message.sessionID, {from: self.ethereumAccount, gas: 1000000}).then(function() {
@@ -156,7 +169,7 @@ function Node(options) {
                       }).catch(function(err) {
                         console.log(err);
                       });
-                    }, 5000);
+                    }, 10000);
                   }
                 }, 5000);
               }).catch(function(err) {
@@ -343,6 +356,13 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
 
           // upload pathToken to Validation System
           self.validationSystem.uploadPathToken(message.sessionID, message.pathToken.toString(), "", message.sequenceNumber, {from: self.ethereumAccount, gas: 1000000}).then(function() {
+            if (self.uploadedPathTokenNumber[message.sessionID] !== undefined) {
+              self.uploadedPathTokenNumber[message.sessionID]++;
+            }
+            else {
+              self.uploadedPathTokenNumber[message.sessionID] = 1;
+              self.isPoBCheckerDecided[message.sessionID] = false;
+            }
             self.validationSystem.getSessionStatus(message.sessionID, message.sequenceNumber, {from: self.ethereumAccount}).then(function(result) {
               console.log("[%s] Path token is uploaded to Validation System", self.id);
               console.log("[%s] -----Data from Validation System-----", self.id);
@@ -360,7 +380,8 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
                   console.log(err);
                 });
 
-                if (message.sequenceNumber == 0) {
+                if (self.uploadedPathTokenNumber[message.sessionID] == message.theNumberOfPackets && self.isPoBCheckerDecided[message.sessionID] == false) {
+                  self.isPoBCheckerDecided[message.sessionID] = true;
                   setTimeout(function() {
                     console.log("[%s] Decide the checker of proof of bandwidth", self.id);
                     self.validationSystem.decideCheckerOfPoB(message.sessionID, {from: self.ethereumAccount, gas: 1000000}).then(function() {
@@ -375,7 +396,7 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
                     }).catch(function(err) {
                       console.log(err);
                     });
-                  }, 5000);
+                  }, 10000);
                 }
               }, 5000);
             }).catch(function(err) {
@@ -518,6 +539,13 @@ Node.prototype._sendMessage = function(type, host, port, message) {
 
       // upload pathToken to Validation System
       self.validationSystem.uploadPathToken(parsedMessage.sessionID, parsedMessage.pathToken.toString(), transferBreakpoint, parsedMessage.sequenceNumber, {from: self.ethereumAccount, gas: 1000000}).then(function() {
+        if (self.uploadedPathTokenNumber[parsedMessage.sessionID] !== undefined) {
+          self.uploadedPathTokenNumber[parsedMessage.sessionID]++;
+        }
+        else {
+          self.uploadedPathTokenNumber[parsedMessage.sessionID] = 1;
+          self.isPoBCheckerDecided[parsedMessage.sessionID] = false;
+        }
         self.validationSystem.getSessionStatus(parsedMessage.sessionID, parsedMessage.sequenceNumber, {from: self.ethereumAccount}).then(function(result) {
           console.log("[%s] Path token is uploaded to Validation System", self.id);
           console.log("[%s] -----Data from Validation System-----", self.id);
@@ -536,7 +564,8 @@ Node.prototype._sendMessage = function(type, host, port, message) {
               console.log(err);
             });
 
-            if (parsedMessage.sequenceNumber == 0) {
+            if (self.uploadedPathTokenNumber[parsedMessage.sessionID] == parsedMessage.theNumberOfPackets && self.isPoBCheckerDecided[parsedMessage.sessionID] == false) {
+              self.isPoBCheckerDecided[parsedMessage.sessionID] = true;
               setTimeout(function() {
                 console.log("[%s] Decide the checker of proof of bandwidth", self.id);
                 self.validationSystem.decideCheckerOfPoB(parsedMessage.sessionID, {from: self.ethereumAccount, gas: 1000000}).then(function() {
@@ -551,7 +580,7 @@ Node.prototype._sendMessage = function(type, host, port, message) {
                 }).catch(function(err) {
                   console.log(err);
                 });
-              }, 5000);
+              }, 10000);
             }
           }, 5000);
         }).catch(function(err) {
@@ -710,7 +739,7 @@ Node.prototype.addSessionToValidationSystem = function(receiver, packetArray) {
           }).catch(function(err) {
             console.log(err);
           });
-        }, 5000);
+        }, 10000);
       }, 60000);
 
       self.isPoBTriggered.push({
@@ -869,37 +898,74 @@ Node.prototype.getDataForProofOfBandwidth = function(sessionID, theNumberOfPacke
         payload: result[0],
         pathToken: result[1],
         sequenceNumber: result[2].toNumber(),
-        senderID: result[3]
+        senderID: result[3],
+        transferResult: result[4]
       });
       self.validationSystem.setSessionIsPending(sessionID, result[2], {from: self.ethereumAccount}).then(function() {
         sessionCounter++;
         if (sessionCounter == theNumberOfPackets) {
           var dataCounter = 0;
           var theNumberOfdata = 0;
-          sessionArray.forEach(function(element) {
-            var pathTokenList = element.pathToken.split(',');
-            theNumberOfdata += pathTokenList.length-1;
-            for (var j = 0; j < pathTokenList.length-1; j++) {
-              self.validationSystem.requestForCheckingData(sessionID, pathTokenList[j], element.sequenceNumber, {from: self.ethereumAccount}).then(function(dataResult) {
-                dataArray.push({
-                  fromNodeID: dataResult[0],
-                  hashValue: dataResult[1],
-                  seed: dataResult[2],
-                  sequenceNumber: dataResult[3].toNumber(),
-                  toNodeID: dataResult[4]
-                });
-                self.validationSystem.setDataIsPending(sessionID, dataResult[0], dataResult[3], {from: self.ethereumAccount, gas: 1000000}).then(function() {
-                  dataCounter++;
-                  if (dataCounter == theNumberOfdata) {
-                    self._doProofOfBandwidth(sessionID, theNumberOfPackets, sessionArray, dataArray);
+          self.validationSystem.getTheNumberOfData(sessionID, {from: self.ethereumAccount}).then(function(theNumberOfdataResult) {
+            theNumberOfdata = theNumberOfdataResult;
+            sessionArray.forEach(function(element) {
+              if (element.pathToken != '') {
+                if (element.transferResult == false) {
+                  theNumberOfdata--;
+                }
+                var pathTokenList = element.pathToken.split(',');
+                for (var j = 0; j < pathTokenList.length-1; j++) {
+                  self.validationSystem.requestForCheckingData(sessionID, pathTokenList[j], element.sequenceNumber, {from: self.ethereumAccount}).then(function(dataResult) {
+                    dataArray.push({
+                      fromNodeID: dataResult[0],
+                      hashValue: dataResult[1],
+                      seed: dataResult[2],
+                      sequenceNumber: dataResult[3].toNumber(),
+                      toNodeID: dataResult[4]
+                    });
+                    self.validationSystem.setDataIsPending(sessionID, dataResult[0], dataResult[3], {from: self.ethereumAccount, gas: 1000000}).then(function() {
+                      dataCounter++;
+                      if (dataCounter == theNumberOfdata) {
+                        self._doProofOfBandwidth(sessionID, theNumberOfPackets, sessionArray, dataArray);
+                      }
+                    }).catch(function(err) {
+                      console.log(err);
+                    });
+                  }).catch(function(err) {
+                    console.log(err);
+                  });
+                }
+              }
+              else {
+                self.validationSystem.getDataArrayLength(sessionID, element.sequenceNumber, {from: self.ethereumAccount}).then(function(dataArrayLength) {
+                  for (var i = 0; i < dataArrayLength; i++) {
+                    self.validationSystem.requestForCheckingDataWithoutFromNodeID(sessionID, element.sequenceNumber, i, {from: self.ethereumAccount}).then(function(dataResult) {
+                      dataArray.push({
+                        fromNodeID: dataResult[0],
+                        hashValue: dataResult[1],
+                        seed: dataResult[2],
+                        sequenceNumber: dataResult[3].toNumber(),
+                        toNodeID: dataResult[4]
+                      });
+                      self.validationSystem.setDataIsPending(sessionID, dataResult[0], dataResult[3], {from: self.ethereumAccount, gas: 1000000}).then(function() {
+                        dataCounter++;
+                        if (dataCounter == theNumberOfdata) {
+                          self._doProofOfBandwidth(sessionID, theNumberOfPackets, sessionArray, dataArray);
+                        }
+                      }).catch(function(err) {
+                        console.log(err);
+                      });
+                    }).catch(function(err) {
+                      console.log(err);
+                    });
                   }
                 }).catch(function(err) {
                   console.log(err);
                 });
-              }).catch(function(err) {
-                console.log(err);
-              });
-            }
+              }
+            });
+          }).catch(function(err) {
+            console.log(err);
           });
         }
       }).catch(function(err) {
@@ -958,7 +1024,38 @@ Node.prototype._doProofOfBandwidth = function(sessionID, theNumberOfPackets, ses
       }
 
       console.log("[%s] Path token is invalid, sessionID: %d, sequenceNumber: %d", self.id, sessionID, sessionArray[i].sequenceNumber);
-      this.validationSystem.handlePathTokenIsInvalid(sessionID, sessionArray[i].sequenceNumber, lastFromNodeID, lastToNodeID, {from: this.ethereumAccount, gas: 1000000}).catch(function(err) {
+      this.validationSystem.handlePathTokenIsInvalid(sessionID, sessionArray[i].sequenceNumber, lastFromNodeID, lastToNodeID, {from: this.ethereumAccount, gas: 1000000}).then(function() {
+        sessionCounter++;
+        self.validationSystem.getSessionStatus(sessionID, sessionCounter, {from: self.ethereumAccount}).then(function(result) {
+          console.log("[%s] -----Data from Validation System-----", self.id);
+          console.log("[%s] Session ID: %d", self.id, result[0].toNumber());
+          console.log("[%s] Transfer result: %s", self.id, result[3].toString());
+          console.log("[%s] Sequence number: %d", self.id, result[4]);
+          console.log("[%s] The number of packets: %d", self.id, result[5]);
+          if (result[6] != "") {
+            console.log("[%s] Transfer breakpoint: %s", self.id, result[6]);
+          }
+          console.log("[%s] PoB result: %s", self.id, result[7].toString());
+          if (result[8] != "") {
+            console.log("[%s] PoB breakpoint: %s", self.id, result[8]);
+          }
+          console.log("[%s] -----Data End-----", self.id);
+
+          getReputationCounter++;
+          if (getReputationCounter == theNumberOfPackets) {
+            self.reputationSystem.getReputationScore({from: self.ethereumAccount}).then(function(result) {
+              console.log("[%s] Get reputation score from Reputation System", self.id);
+              console.log("[%s] -----Data from Reputation System-----", self.id);
+              console.log("[%s] Reputation score: %d", self.id, result.toNumber());
+              console.log("[%s] -----Data End-----", self.id);
+            }).catch(function(err) {
+              console.log(err);
+            });
+          }
+        }).catch(function(err) {
+          console.log(err);
+        });
+      }).catch(function(err) {
         console.log(err);
       });
       continue;
