@@ -2,6 +2,8 @@
 
 const net = require('net');
 const sha256 = require('js-sha256');
+const Web3 = require('web3');
+const web3 = new Web3();
 
 function Node(options) {
   if (options.id !== undefined) {
@@ -56,6 +58,16 @@ function Node(options) {
   }
   else {
     console.error("[%s] Can't initialize Reputation System", this.id);
+    process.exit(1);
+  }
+
+  if (options.paymentSystem !== undefined) {
+    this.paymentSystem = options.paymentSystem;
+
+    this._registerInPaymentSystem();
+  }
+  else {
+    console.error("[%s] Can't initialize Payment System", this.id);
     process.exit(1);
   }
 
@@ -315,9 +327,10 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
   socket.connect(port, host, function() {
     console.log("[%s] Connected to %s:%d", self.id, host, port);
     var info = [self.id, type];
-    socket.write(info + '\n');
+    this.write(info + '\n');
   });
   socket.on('data', function(data) {
+    var socketReference = this;
     var dataQueue = data.toString().split('\n'); // '\n' is the delimiter of data
     dataQueue.pop(); // remove the last '\n' of data
     dataQueue.forEach(function(element) {
@@ -333,13 +346,13 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
         if (self.receivedPacket.includes(message.sessionID + ',' + message.sequenceNumber) == true) {
           console.log("[%s] The packet has been received, drop it", self.id);
           // retransmit ack to sender
-          socket.write(message.sessionID + ',' + message.sequenceNumber + '\n');
+          socketReference.write(message.sessionID + ',' + message.sequenceNumber + '\n');
           return;
         }
         else {
           self.receivedPacket.push(message.sessionID + ',' + message.sequenceNumber);
           // send ack to sender
-          socket.write(message.sessionID + ',' + message.sequenceNumber + '\n');
+          socketReference.write(message.sessionID + ',' + message.sequenceNumber + '\n');
         }
 
         message.pathToken.push(self.id);
@@ -818,7 +831,7 @@ Node.prototype._addTimeToUploadSeedListener = function(timeToUploadSeed) {
 
 Node.prototype._registerInReputationSystem = function() {
   var self = this;
-  this.reputationSystem.initReputationScore(this.id, {from: this.ethereumAccount}).then(function() {
+  this.reputationSystem.initAddressList(this.id, {from: this.ethereumAccount}).then(function() {
     console.log("[%s] Registered in Reputation System", self.id);
     self.reputationSystem.getReputationScore({from: self.ethereumAccount}).then(function(result) {
       console.log("[%s] Get reputation score from Reputation System", self.id);
@@ -1117,6 +1130,40 @@ Node.prototype._addPoBisTriggeredListener = function(PoBisTriggered) {
     else {
       console.log(error);
     }
+  });
+}
+
+Node.prototype._registerInPaymentSystem = function() {
+  var self = this;
+  this.paymentSystem.initAddressList(this.id, {from: this.ethereumAccount}).then(function() {
+    console.log("[%s] Registered in Payment System", self.id);
+  }).catch(function(err) {
+    console.log(err);
+  });
+}
+
+Node.prototype.setRelayContract = function(vendor, relayType, maxBandwidth, expirationTime, price) {
+  var self = this;
+  price = web3.toWei(price, 'ether');
+  this.paymentSystem.setRelayContract(this.id, vendor, relayType, maxBandwidth, expirationTime, price, {from: this.ethereumAccount, gas: 1000000, value: price}).then(function() {
+    self.paymentSystem.getRelayContractStatus(self.id, vendor, {from: self.ethereumAccount}).then(function(result) {
+      console.log("[%s] Relay contract is set", self.id);
+      console.log("[%s] -----Data from Payment System-----", self.id);
+      console.log("[%s] Purchaser ID: %s", self.id, self.id);
+      console.log("[%s] Vendor ID: %s", self.id, vendor);
+      console.log("[%s] Relay type: %s", self.id, result[0]);
+      console.log("[%s] Max bandwidth: %d (char)", self.id, result[1].toNumber());
+      var date = new Date(0);
+      date.setUTCSeconds(result[2].toNumber());
+      console.log("[%s] Set time: %s", self.id, date);
+      console.log("[%s] Expiration time: %d (second)", self.id, result[3].toNumber());
+      console.log("[%s] Price: %d (ether)", self.id, web3.fromWei(result[4], 'ether').toNumber());
+      console.log("[%s] -----Data End-----", self.id);
+    }).catch(function(err) {
+      console.log(err);
+    });
+  }).catch(function(err) {
+    console.log(err);
   });
 }
 

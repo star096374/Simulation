@@ -28,7 +28,7 @@ contract Reputation {
 
   }
 
-  function initReputationScore(string id) public {
+  function initAddressList(string id) public {
     addressList[id] = msg.sender;
   }
 

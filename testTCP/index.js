@@ -25,9 +25,19 @@ const reputation_artifacts = require('../smart_contract/build/contracts/Reputati
 var Reputation = contract(reputation_artifacts);
 var reputation = Reputation.at(reputationAddress);
 
+var paymentABI = fs.readFileSync('../smart_contract/build/contracts/Payment.json');
+var parsedPaymentABI = JSON.parse(paymentABI);
+var lastNetworksKeyOfPayment = Object.keys(parsedPaymentABI.networks).slice(-1)[0];
+var paymentAddress = parsedPaymentABI.networks[lastNetworksKeyOfPayment].address;
+
+const payment_artifacts = require('../smart_contract/build/contracts/Payment.json');
+var Payment = contract(payment_artifacts);
+var payment = Payment.at(paymentAddress);
+
 web3.setProvider(new web3.providers.HttpProvider('http://localhost:8545'));
 Validation.setProvider(web3.currentProvider);
 Reputation.setProvider(web3.currentProvider);
+Payment.setProvider(web3.currentProvider);
 
 var nodeID = ['node0', 'node1', 'node2', 'node3', 'node4', 'node5'];
 var nodePort = [3000, 4000, 5000, 6000, 7000, 8000];
@@ -37,7 +47,8 @@ var checkerID = ['checker0', 'checker1'];
 var checkerPort = [9000, 10000];
 var checkerList = [];
 
-var checkReputationTime = 45000;
+var startTime = 20000;
+var checkReputationTime = 70000;
 
 web3.eth.getAccounts(function(err, accs) {
   if (err != null) {
@@ -56,7 +67,8 @@ web3.eth.getAccounts(function(err, accs) {
       host: '127.0.0.1',
       ethereumAccount: accs[i],
       validationSystem: validation,
-      reputationSystem: reputation
+      reputationSystem: reputation,
+      paymentSystem: payment
     }));
   }
 
@@ -67,11 +79,13 @@ web3.eth.getAccounts(function(err, accs) {
       host: '127.0.0.1',
       ethereumAccount: accs[i + nodeList.length],
       validationSystem: validation,
-      reputationSystem: reputation
+      reputationSystem: reputation,
+      paymentSystem: payment
     }));
   }
 
   createTopology();
+  initRelayContractRelationship();
 });
 
 // random session ID
@@ -96,12 +110,12 @@ for (var i = 0; i < theNumberOfPackets; i++) {
 }
 
 setTimeout(function() {
-  console.log("*After 5 secs*");
+  console.log("*After %d secs*", startTime / 1000);
   console.log("[%s] Add Session struct to Validation System", nodeList[0].id);
 
   var receiverIndex = Number(packetArray[0].receiver[4]);
   nodeList[0].addSessionToValidationSystem(nodeList[receiverIndex].ethereumAccount, packetArray);
-}, 5000);
+}, startTime);
 
 setTimeout(function() {
   console.log("*After %d secs*", checkReputationTime / 1000);
@@ -134,4 +148,11 @@ function checkReputationScore() {
       console.log(err);
     });
   }
+}
+
+function initRelayContractRelationship() {
+  nodeList[0].setRelayContract(nodeID[1], 'Exit Relay', 1000, 300, 10);
+  nodeList[1].setRelayContract(nodeID[2], 'Exit Relay', 1000, 300, 10);
+  nodeList[4].setRelayContract(nodeID[3], 'Entry Relay', 1000, 300, 10);
+  nodeList[5].setRelayContract(nodeID[4], 'Entry Relay', 1000, 300, 10);
 }
