@@ -4,6 +4,7 @@ const net = require('net');
 const sha256 = require('js-sha256');
 const Web3 = require('web3');
 const web3 = new Web3();
+web3.setProvider(new web3.providers.HttpProvider('http://localhost:8545'));
 
 function Node(options) {
   if (options.id !== undefined) {
@@ -65,6 +66,9 @@ function Node(options) {
     this.paymentSystem = options.paymentSystem;
 
     this._registerInPaymentSystem();
+
+    var relayContractIsSet = this.paymentSystem.relayContractIsSet({fromBlock: 0, toBlock: 'latest'});
+    this._addrelayContractIsSetListener(relayContractIsSet);
   }
   else {
     console.error("[%s] Can't initialize Payment System", this.id);
@@ -93,6 +97,9 @@ function Node(options) {
   this.uploadedPathTokenNumber = {};
   // whether the PoBChecker is decided
   this.isPoBCheckerDecided = {};
+
+  // store the status of relay contract
+  this.relayContractStatus = [];
 
   this.server = net.createServer(function(socket) {
     // if someone connect to this server, this function will be triggered
@@ -286,7 +293,7 @@ function Node(options) {
               return;
             }
             else {
-              console.log("*[%s] Receive ack, session ID: %d, sequenceNumber: %d*", self.id,  element[0], element[1]);
+              console.log("*[%s] Receive ack, session ID: %d, sequence number: %d*", self.id,  element[0], element[1]);
               var index = self.retransmitArray.map(function(t) {
                 return t.sessionID + ',' + t.sequenceNumber;
               }).indexOf(element.toString());
@@ -484,7 +491,7 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
             return;
           }
           else {
-            console.log("*[%s] Receive ack, session ID: %d, sequenceNumber: %d*", self.id,  element[0], element[1]);
+            console.log("*[%s] Receive ack, session ID: %d, sequence number: %d*", self.id,  element[0], element[1]);
             var index = self.retransmitArray.map(function(t) {
               return t.sessionID + ',' + t.sequenceNumber;
             }).indexOf(element.toString());
@@ -1164,6 +1171,43 @@ Node.prototype.setRelayContract = function(vendor, relayType, maxBandwidth, expi
     });
   }).catch(function(err) {
     console.log(err);
+  });
+}
+
+Node.prototype._addrelayContractIsSetListener = function(relayContractIsSet) {
+  var self = this;
+  relayContractIsSet.watch(function(error, result) {
+    if (!error) {
+      /*console.log("[%s] Event relayContractIsSet is triggered", self.id);
+      console.log("[%s] -----Data from Payment System-----", self.id);
+      console.log("[%s] Purchaser ID: %s", self.id, result.args.purchaserID);
+      console.log("[%s] Vendor ID: %s", self.id, result.args.vendorID);
+      console.log("[%s] Relay type: %s", self.id, result.args.relayType);
+      console.log("[%s] Max bandwidth: %d (char)", self.id, result.args.maxBandwidth.toNumber());
+      console.log("[%s] Expiration time: %d (second)", self.id, result.args.expirationTime.toNumber());
+      console.log("[%s] -----Data End-----", self.id);*/
+
+      if (result.args.vendorID == self.id) {
+        var relayContractTimer = setTimeout(function() {
+          console.log("[%s] Relay contract expired, purchaser ID: %s", self.id, result.args.purchaserID);
+          self.paymentSystem.relayContractFinish(result.args.purchaserID, self.id, {from: self.ethereumAccount, gas: 1000000}).then(function() {
+            console.log("[%s] Balance: %d (ether)", self.id, web3.fromWei(web3.eth.getBalance(self.ethereumAccount), 'ether').toNumber());
+          }).catch(function(err) {
+            console.log(err);
+          });
+        }, result.args.expirationTime.toNumber() * 1000);
+
+        self.relayContractStatus.push({
+          purchaserID: result.args.purchaserID,
+          relayType: result.args.relayType,
+          maxBandwidth: result.args.maxBandwidth.toNumber(),
+          relayContractTimer: relayContractTimer
+        });
+      }
+    }
+    else {
+      console.log(error);
+    }
   });
 }
 

@@ -296,6 +296,35 @@ contract Validation {
     }
   }
 
+  function getTransferStatus(string _purchaserID, string _vendorID, string _relayType) public view returns(uint256) {
+    uint256 _usedBandwidth = 0;
+    if (_relayType.compareTo('Exit Relay')) {
+      for (uint256 i = 0; i < DataArray.length; i++) {
+        if (DataArray[i].fromNodeID.compareTo(_purchaserID) && DataArray[i].toNodeID.compareTo(_vendorID)) {
+          for (uint256 j = 0; j < SessionArray.length; j++) {
+            if (SessionArray[j].id == DataArray[i].sessionID && SessionArray[j].sequenceNumber == DataArray[i].sequenceNumber) {
+              _usedBandwidth += SessionArray[j].packetLength;
+              break;
+            }
+          }
+        }
+      }
+    }
+    else {
+      for (uint256 k = 0; k < DataArray.length; k++) {
+        if (DataArray[k].fromNodeID.compareTo(_vendorID) && DataArray[k].toNodeID.compareTo(_purchaserID)) {
+          for (uint256 l = 0; l < SessionArray.length; l++) {
+            if (SessionArray[l].id == DataArray[k].sessionID && SessionArray[l].sequenceNumber == DataArray[k].sequenceNumber) {
+              _usedBandwidth += SessionArray[l].packetLength;
+              break;
+            }
+          }
+        }
+      }
+    }
+    return (_usedBandwidth);
+  }
+
   function getData(uint256 _sessionID, uint256 _sequenceNumber) public view returns(uint256, string, string, uint256, string) {
     for (uint256 i = 0; i < DataArray.length; i++) {
       if (DataArray[i].sessionID == _sessionID && DataArray[i].fromNode == msg.sender && DataArray[i].sequenceNumber == _sequenceNumber) {

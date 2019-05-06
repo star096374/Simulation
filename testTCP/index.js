@@ -47,8 +47,9 @@ var checkerID = ['checker0', 'checker1'];
 var checkerPort = [9000, 10000];
 var checkerList = [];
 
-var startTime = 20000;
-var checkReputationTime = 70000;
+var startTime = 10000;
+var checkReputationTime = 80000;
+var simulationEndTime = 110000;
 
 web3.eth.getAccounts(function(err, accs) {
   if (err != null) {
@@ -122,6 +123,12 @@ setTimeout(function() {
   checkReputationScore();
 }, checkReputationTime);
 
+setTimeout(function() {
+  console.log("*After %d secs*", simulationEndTime / 1000);
+  console.log("*Simulation Finish*");
+  process.exit(0);
+}, simulationEndTime);
+
 function createTopology() {
   nodeList[0].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[1]);
   nodeList[1].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[2]);
@@ -140,10 +147,6 @@ function checkReputationScore() {
       console.log("[%s] -----Data End-----", nodeID[counter]);
 
       counter += 1;
-      if (counter == nodeList.length) {
-        console.log("*Simulation Finish*");
-        process.exit(0);
-      }
     }).catch(function(err) {
       console.log(err);
     });
@@ -151,8 +154,8 @@ function checkReputationScore() {
 }
 
 function initRelayContractRelationship() {
-  nodeList[0].setRelayContract(nodeID[1], 'Exit Relay', 1000, 300, 10);
-  nodeList[1].setRelayContract(nodeID[2], 'Exit Relay', 1000, 300, 10);
-  nodeList[4].setRelayContract(nodeID[3], 'Entry Relay', 1000, 300, 10);
-  nodeList[5].setRelayContract(nodeID[4], 'Entry Relay', 1000, 300, 10);
+  nodeList[0].setRelayContract(nodeID[1], 'Exit Relay', 2000, 100, 10);
+  nodeList[1].setRelayContract(nodeID[2], 'Exit Relay', 2000, 100, 10);
+  nodeList[4].setRelayContract(nodeID[3], 'Entry Relay', 2000, 100, 10);
+  nodeList[5].setRelayContract(nodeID[4], 'Entry Relay', 2000, 100, 10);
 }

@@ -3,8 +3,9 @@ var Reputation = artifacts.require("./Reputation.sol");
 var Payment = artifacts.require("./Payment.sol");
 
 module.exports = function(deployer) {
-  deployer.deploy(Reputation).then(function() {
-    deployer.deploy(Validation, Reputation.address);
+  deployer.then(async () => {
+    await deployer.deploy(Reputation);
+    await deployer.deploy(Validation, Reputation.address);
+    await deployer.deploy(Payment, Validation.address);
   });
-  deployer.deploy(Payment);
 }
