@@ -300,11 +300,20 @@ contract Validation {
     uint256 _usedBandwidth = 0;
     if (_relayType.compareTo('Exit Relay')) {
       for (uint256 i = 0; i < DataArray.length; i++) {
+        uint256 _packetLength = 0;
+        for (uint256 j = 0; j < SessionArray.length; j++) {
+          if (SessionArray[j].id == DataArray[i].sessionID && SessionArray[j].sequenceNumber == DataArray[i].sequenceNumber) {
+            _packetLength = SessionArray[j].packetLength;
+            break;
+          }
+        }
         if (DataArray[i].fromNodeID.compareTo(_purchaserID) && DataArray[i].toNodeID.compareTo(_vendorID)) {
-          for (uint256 j = 0; j < SessionArray.length; j++) {
-            if (SessionArray[j].id == DataArray[i].sessionID && SessionArray[j].sequenceNumber == DataArray[i].sequenceNumber) {
-              _usedBandwidth += SessionArray[j].packetLength;
-              break;
+          for (uint256 m = 0; m < DataArray.length; m++) {
+            if (DataArray[m].fromNodeID.compareTo(_vendorID)) {
+              if (DataArray[m].sessionID == DataArray[i].sessionID && DataArray[m].sequenceNumber == DataArray[i].sequenceNumber) {
+                _usedBandwidth += _packetLength;
+                break;
+              }
             }
           }
         }
