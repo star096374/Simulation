@@ -41,11 +41,14 @@ function Node(options) {
 
     if (this.id == "checker0" || this.id == "checker1") {
       var competeForPoB = this.validationSystem.competeForPoB({fromBlock: 0, toBlock: 'latest'});
-      this._addcompeteForPoBListener(competeForPoB);
+      this._addCompeteForPoBListener(competeForPoB);
 
       var winPoBCompetition = this.validationSystem.winPoBCompetition({fromBlock: 0, toBlock: 'latest'});
-      this._addwinPoBCompetitionListener(winPoBCompetition);
+      this._addWinPoBCompetitionListener(winPoBCompetition);
     }
+
+    var timeToUploadPureHashOfPayload = this.validationSystem.timeToUploadPureHashOfPayload({fromBlock: 0, toBlock: 'latest'});
+    this._addTimeToUploadPureHashOfPayloadListener(timeToUploadPureHashOfPayload);
   }
   else {
     console.error("[%s] Can't initialize Validation System", this.id);
@@ -68,7 +71,7 @@ function Node(options) {
     this._registerInPaymentSystem();
 
     var relayContractIsSet = this.paymentSystem.relayContractIsSet({fromBlock: 0, toBlock: 'latest'});
-    this._addrelayContractIsSetListener(relayContractIsSet);
+    this._addRelayContractIsSetListener(relayContractIsSet);
   }
   else {
     console.error("[%s] Can't initialize Payment System", this.id);
@@ -228,7 +231,7 @@ function Node(options) {
 
             // hash payload by sha256, and then upload to Validation System
             var seed = self._generateRandomString();
-            var hashedPayload = sha256(seed + message.payload);
+            var hashedPayload = sha256(seed + sha256(message.payload));
             self.seedArray.push({
               sessionID: message.sessionID,
               hash: hashedPayload,
@@ -445,7 +448,7 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
 
           // hash payload by sha256, and then upload to Validation System
           var seed = self._generateRandomString();
-          var hashedPayload = sha256(seed + message.payload);
+          var hashedPayload = sha256(seed + sha256(message.payload));
           self.seedArray.push({
             sessionID: message.sessionID,
             hash: hashedPayload,
@@ -684,13 +687,12 @@ Node.prototype.addSessionToValidationSystem = function(receiver, packetArray) {
     var payload = packetArray[i].payload;
     var sequenceNumber = packetArray[i].sequenceNumber;
     var packetLength = JSON.stringify(packetArray[i]).length;
-    this.validationSystem.addSession(sessionID, receiver, payload, packetLength, sequenceNumber, theNumberOfPackets, self.id, {from: this.ethereumAccount, gas: 1000000}).then(function() {
+    this.validationSystem.addSession(sessionID, receiver, packetLength, sequenceNumber, theNumberOfPackets, self.id, {from: this.ethereumAccount, gas: 1000000}).then(function() {
       sessionCounter++;
       self.validationSystem.getSessionInformation(sessionID, sessionCounter, {from: self.ethereumAccount}).then(function(result) {
         console.log("[%s] -----Data from Validation System-----", self.id);
         console.log("[%s] Session ID: %d", self.id, result[0].toNumber());
         console.log("[%s] Receiver address: %s", self.id, result[1]);
-        console.log("[%s] Payload: %s", self.id, result[2]);
         console.log("[%s] Packet length: %d", self.id, result[3]);
         console.log("[%s] Sequence number: %d", self.id, result[5]);
         console.log("[%s] The number of packets: %d", self.id, result[6]);
@@ -703,12 +705,13 @@ Node.prototype.addSessionToValidationSystem = function(receiver, packetArray) {
 
         // hash payload by sha256, and then upload to Validation System
         var seed = self._generateRandomString();
-        var hashedPayload = sha256(seed + payload);
+        var hashedPayload = sha256(seed + sha256(payload));
         self.seedArray.push({
           sessionID: sessionID,
           hash: hashedPayload,
           seed: seed,
-          sequenceNumber: sequenceNumber
+          sequenceNumber: sequenceNumber,
+          pureHashOfPayload: sha256(payload)
         });
 
         self.validationSystem.uploadData(sessionID, self.id, hashedPayload, sequenceNumber, {from: self.ethereumAccount, gas: 1000000}).then(function() {
@@ -853,7 +856,7 @@ Node.prototype._registerInReputationSystem = function() {
   });
 }
 
-Node.prototype._addcompeteForPoBListener = function(competeForPoB) {
+Node.prototype._addCompeteForPoBListener = function(competeForPoB) {
   var self = this;
   competeForPoB.watch(function(error, result) {
     if (!error) {
@@ -884,7 +887,7 @@ Node.prototype._addcompeteForPoBListener = function(competeForPoB) {
   });
 }
 
-Node.prototype._addwinPoBCompetitionListener = function(winPoBCompetition) {
+Node.prototype._addWinPoBCompetitionListener = function(winPoBCompetition) {
   var self = this;
   winPoBCompetition.watch(function(error, result) {
     if (!error) {
@@ -915,7 +918,7 @@ Node.prototype.getDataForProofOfBandwidth = function(sessionID, theNumberOfPacke
     var sessionCounter = 0;
     this.validationSystem.requestForCheckingSession(sessionID, i, {from: this.ethereumAccount}).then(function(result) {
       sessionArray.push({
-        payload: result[0],
+        pureHashOfPayload: result[0],
         pathToken: result[1],
         sequenceNumber: result[2].toNumber(),
         senderID: result[3],
@@ -1011,7 +1014,10 @@ Node.prototype._doProofOfBandwidth = function(sessionID, theNumberOfPackets, ses
       var isMatched = false;
       for (var k = 0; k < dataArray.length; k++) {
         if (dataArray[k].sequenceNumber == sessionArray[i].sequenceNumber && dataArray[k].fromNodeID == pathTokenList[j]) {
-          if (sha256(dataArray[k].seed + sessionArray[i].payload) == dataArray[k].hashValue) {
+          if (sha256(dataArray[k].seed + sessionArray[i].pureHashOfPayload) == dataArray[k].hashValue) {
+            self.validationSystem.setDataIsValid(sessionID, dataArray[k].fromNodeID, dataArray[k].sequenceNumber, {from: self.ethereumAccount, gas: 1000000}).catch(function(err) {
+              console.log(err);
+            });
             isMatched = true;
             break;
           }
@@ -1174,7 +1180,7 @@ Node.prototype.setRelayContract = function(vendor, relayType, maxBandwidth, expi
   });
 }
 
-Node.prototype._addrelayContractIsSetListener = function(relayContractIsSet) {
+Node.prototype._addRelayContractIsSetListener = function(relayContractIsSet) {
   var self = this;
   relayContractIsSet.watch(function(error, result) {
     if (!error) {
@@ -1202,6 +1208,46 @@ Node.prototype._addrelayContractIsSetListener = function(relayContractIsSet) {
           relayType: result.args.relayType,
           maxBandwidth: result.args.maxBandwidth.toNumber(),
           relayContractTimer: relayContractTimer
+        });
+      }
+    }
+    else {
+      console.log(error);
+    }
+  });
+}
+
+Node.prototype._addTimeToUploadPureHashOfPayloadListener = function(timeToUploadPureHashOfPayload) {
+  var self = this;
+  timeToUploadPureHashOfPayload.watch(function(error, result) {
+    if (!error) {
+      /*console.log("[%s] Event timeToUploadPureHashOfPayload is triggered", self.id);
+      console.log("[%s] -----Data from Validation System-----", self.id);
+      console.log("[%s] Session ID: %d", self.id, result.args.sessionID);
+      console.log("[%s] Sequence number: %d", self.id, result.args.sequenceNumber);
+      console.log("[%s] Sender address: %s", self.id, result.args.sender);
+      console.log("[%s] -----Data End-----", self.id);*/
+
+      if (result.args.sender == self.ethereumAccount) {
+        var pureHashOfPayload;
+        self.seedArray.forEach(function(item) {
+          if (item.sessionID == result.args.sessionID && item.sequenceNumber == result.args.sequenceNumber) {
+            pureHashOfPayload = item.pureHashOfPayload;
+          }
+        });
+        self.validationSystem.uploadPureHashOfPayload(result.args.sessionID, result.args.sequenceNumber, pureHashOfPayload, {from: self.ethereumAccount, gas: 1000000}).then(function() {
+          self.validationSystem.getSessionInformation(result.args.sessionID, result.args.sequenceNumber, {from: self.ethereumAccount}).then(function(result) {
+            console.log("[%s] Check whether pureHashOfPayload is uploaded to Validation System", self.id);
+            console.log("[%s] -----Data from Validation System-----", self.id);
+            console.log("[%s] Session ID: %d", self.id, result[0]);
+            console.log("[%s] Pure hash of payload: %s", self.id, result[2]);
+            console.log("[%s] Sequence number: %d", self.id, result[5]);
+            console.log("[%s] -----Data End-----", self.id);
+          }).catch(function(err) {
+            console.log(err);
+          });
+        }).catch(function(err) {
+          console.log(err);
         });
       }
     }

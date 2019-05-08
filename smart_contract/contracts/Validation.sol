@@ -21,11 +21,12 @@ contract Validation {
   event competeForPoB(uint256 sessionID);
   event winPoBCompetition(uint256 sessionID, address winnerOfPoBCompetition, uint256 theNumberOfPackets);
   event PoBisTriggered(uint256 sessionID);
+  event timeToUploadPureHashOfPayload(uint256 sessionID, uint256 sequenceNumber, address sender);
 
   struct Session {
     uint256 id;
     address receiver;
-    string payload;
+    string pureHashOfPayload;
     uint256 packetLength;
     string pathToken;
     bool checkable;
@@ -52,6 +53,7 @@ contract Validation {
     uint256 sequenceNumber;
     string toNodeID;
     uint256 counterOfTheSameSessionIDAndSequenceNumber;
+    bool isValid;
   }
 
   // competition for proof of bandwidth
@@ -77,8 +79,8 @@ contract Validation {
     reputation = ReputationInterface(_reputationAddress);
   }
 
-  function addSession(uint256 sessionID, address receiver, string payload, uint256 packetLength, uint256 sequenceNumber, uint256 theNumberOfPackets, string senderID) public {
-    SessionArray.push(Session(sessionID, receiver, payload, packetLength, "", false, false, false, "", false, "", 0, sequenceNumber, theNumberOfPackets, msg.sender, senderID, false));
+  function addSession(uint256 sessionID, address receiver, uint256 packetLength, uint256 sequenceNumber, uint256 theNumberOfPackets, string senderID) public {
+    SessionArray.push(Session(sessionID, receiver, "", packetLength, "", false, false, false, "", false, "", 0, sequenceNumber, theNumberOfPackets, msg.sender, senderID, false));
   }
 
   function uploadData(uint256 sessionID, string fromNodeID, string hashValue, uint256 sequenceNumber) public {
@@ -88,7 +90,7 @@ contract Validation {
         _counter++;
       }
     }
-    DataArray.push(Data(sessionID, msg.sender, fromNodeID, hashValue, "", false, sequenceNumber, "", _counter));
+    DataArray.push(Data(sessionID, msg.sender, fromNodeID, hashValue, "", false, sequenceNumber, "", _counter, false));
   }
 
   function uploadToNodeID(uint256 _sessionID, uint256 _sequenceNumber, string _toNodeID) public {
@@ -104,10 +106,12 @@ contract Validation {
 
   function uploadPathToken(uint256 _sessionID, string _pathToken, string _transferBreakpoint, uint256 _sequenceNumber) public {
     address _receiver;
+    address _sender;
     for (uint256 i = 0; i < SessionArray.length; i++) {
       if (SessionArray[i].id == _sessionID && SessionArray[i].sequenceNumber == _sequenceNumber) {
         SessionArray[i].pathToken = _pathToken;
         _receiver = SessionArray[i].receiver;
+        _sender = SessionArray[i].sender;
         if (_receiver != msg.sender) {
           SessionArray[i].transferBreakpoint = _transferBreakpoint;
         }
@@ -118,6 +122,7 @@ contract Validation {
       }
     }
     emit timeToUploadSeed(_sessionID, _receiver, _pathToken, _sequenceNumber);
+    emit timeToUploadPureHashOfPayload(_sessionID, _sequenceNumber, _sender);
   }
 
   function uploadSeed(uint256 _sessionID, string _hashValue, string _seed, uint256 _sequenceNumber) public {
@@ -129,6 +134,15 @@ contract Validation {
             break;
           }
         }
+      }
+    }
+  }
+
+  function uploadPureHashOfPayload(uint256 _sessionID, uint256 _sequenceNumber, string _pureHashOfPayload) public {
+    for (uint256 i = 0; i < SessionArray.length; i++) {
+      if (SessionArray[i].id == _sessionID && SessionArray[i].sequenceNumber == _sequenceNumber) {
+        SessionArray[i].pureHashOfPayload = _pureHashOfPayload;
+        break;
       }
     }
   }
@@ -212,7 +226,7 @@ contract Validation {
     for (uint256 i = 0; i < SessionArray.length; i++) {
       if (SessionArray[i].id == _sessionID && SessionArray[i].checkable == true && SessionArray[i].isPending == false && SessionArray[i].sequenceNumber == _sequenceNumber) {
         if (msg.sender == SessionArray[i].PoBChecker) {
-          return (SessionArray[i].payload, SessionArray[i].pathToken, SessionArray[i].sequenceNumber, SessionArray[i].senderID, SessionArray[i].transferResult);
+          return (SessionArray[i].pureHashOfPayload, SessionArray[i].pathToken, SessionArray[i].sequenceNumber, SessionArray[i].senderID, SessionArray[i].transferResult);
         }
       }
     }
@@ -274,6 +288,15 @@ contract Validation {
     }
   }
 
+  function setDataIsValid(uint256 _sessionID, string _fromNodeID, uint256 _sequenceNumber) public {
+    for (uint256 i = 0; i < DataArray.length; i++) {
+      if (DataArray[i].sessionID == _sessionID && DataArray[i].fromNodeID.compareTo(_fromNodeID) && DataArray[i].sequenceNumber == _sequenceNumber) {
+        DataArray[i].isValid = true;
+        break;
+      }
+    }
+  }
+
   function isProofOfBandwidthSuccessful(uint256 _sessionID, bool _PoBResult, string _pathToken, string _PoBBreakpoint, uint256 _sequenceNumber) public {
     for (uint256 i = 0; i < SessionArray.length; i++) {
       if (SessionArray[i].id == _sessionID && SessionArray[i].sequenceNumber == _sequenceNumber) {
@@ -300,19 +323,21 @@ contract Validation {
     uint256 _usedBandwidth = 0;
     if (_relayType.compareTo('Exit Relay')) {
       for (uint256 i = 0; i < DataArray.length; i++) {
-        uint256 _packetLength = 0;
-        for (uint256 j = 0; j < SessionArray.length; j++) {
-          if (SessionArray[j].id == DataArray[i].sessionID && SessionArray[j].sequenceNumber == DataArray[i].sequenceNumber) {
-            _packetLength = SessionArray[j].packetLength;
-            break;
-          }
-        }
         if (DataArray[i].fromNodeID.compareTo(_purchaserID) && DataArray[i].toNodeID.compareTo(_vendorID)) {
+          uint256 _packetLength = 0;
+          for (uint256 j = 0; j < SessionArray.length; j++) {
+            if (SessionArray[j].id == DataArray[i].sessionID && SessionArray[j].sequenceNumber == DataArray[i].sequenceNumber) {
+              _packetLength = SessionArray[j].packetLength;
+              break;
+            }
+          }
           for (uint256 m = 0; m < DataArray.length; m++) {
             if (DataArray[m].fromNodeID.compareTo(_vendorID)) {
               if (DataArray[m].sessionID == DataArray[i].sessionID && DataArray[m].sequenceNumber == DataArray[i].sequenceNumber) {
-                _usedBandwidth += _packetLength;
-                break;
+                if (DataArray[m].isValid == true) {
+                  _usedBandwidth += _packetLength;
+                  break;
+                }
               }
             }
           }
@@ -324,8 +349,10 @@ contract Validation {
         if (DataArray[k].fromNodeID.compareTo(_vendorID) && DataArray[k].toNodeID.compareTo(_purchaserID)) {
           for (uint256 l = 0; l < SessionArray.length; l++) {
             if (SessionArray[l].id == DataArray[k].sessionID && SessionArray[l].sequenceNumber == DataArray[k].sequenceNumber) {
-              _usedBandwidth += SessionArray[l].packetLength;
-              break;
+              if (DataArray[k].isValid == true) {
+                _usedBandwidth += SessionArray[l].packetLength;
+                break;
+              }
             }
           }
         }
@@ -345,7 +372,7 @@ contract Validation {
   function getSessionInformation(uint256 _sessionID, uint256 _sequenceNumber) public view returns(uint256, address, string, uint256, string, uint256, uint256, address, string) {
     for (uint256 i = 0; i < SessionArray.length; i++) {
       if (SessionArray[i].id == _sessionID && SessionArray[i].sequenceNumber == _sequenceNumber) {
-        return (SessionArray[i].id, SessionArray[i].receiver, SessionArray[i].payload, SessionArray[i].packetLength, SessionArray[i].pathToken, SessionArray[i].sequenceNumber, SessionArray[i].theNumberOfPackets, SessionArray[i].PoBChecker, SessionArray[i].senderID);
+        return (SessionArray[i].id, SessionArray[i].receiver, SessionArray[i].pureHashOfPayload, SessionArray[i].packetLength, SessionArray[i].pathToken, SessionArray[i].sequenceNumber, SessionArray[i].theNumberOfPackets, SessionArray[i].PoBChecker, SessionArray[i].senderID);
       }
     }
   }
