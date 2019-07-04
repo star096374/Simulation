@@ -249,11 +249,12 @@ function Node(options) {
 
                 if (exitRelayNumber > 0) {
                   console.log("[%s] Forward message to exit relay nodes", self.id);
-                  self.sendMessageToExitRelayNodes(messageWithNewPathToken);
+                  self.sendMessageToExitRelayNode(messageWithNewPathToken);
                 }
                 else if (gatewayNumber > 0) {
                   console.log("[%s] Forward message to gateway", self.id);
-                  self.sendMessageToGateway(messageWithNewPathToken);
+                  var firstEntryRelayNodeID = message.entryPathFilter.toString().split(',')[0];
+                  self.sendMessageToGateway(messageWithNewPathToken, firstEntryRelayNodeID);
                 }
                 else {
                   var newEntryPathFilter = message.entryPathFilter.toString().split(',');
@@ -638,22 +639,36 @@ Node.prototype._sendMessage = function(type, host, port, message) {
   });
 }
 
-Node.prototype.sendMessageToExitRelayNodes = function(message) {
-  var self = this;
-  this.socketClient.forEach(function(element) {
-    if (element.type == 'Exit Relay') {
-      var result = element.address.split(':');
-      var host = result[0];
-      var port = result[1];
-      self._sendMessage('client', host, port, message);
+Node.prototype.sendMessageToExitRelayNode = function(message) {
+  var exitRelayNumber = 0;
+  for (var i = 0; i < this.socketClient.length; i++) {
+    if (this.socketClient[i].type == 'Exit Relay') {
+      exitRelayNumber++;
     }
-  });
+  }
+  var randomNumber = Math.floor(Math.random() * exitRelayNumber);
+
+  var counter = 0;
+  for (var j = 0; j < this.socketClient.length; j++) {
+    if (this.socketClient[j].type == 'Exit Relay') {
+      if (counter == randomNumber) {
+        var result = this.socketClient[j].address.split(':');
+        var host = result[0];
+        var port = result[1];
+        this._sendMessage('client', host, port, message);
+        break;
+      }
+      else {
+        counter++;
+      }
+    }
+  }
 }
 
-Node.prototype.sendMessageToGateway = function(message) {
+Node.prototype.sendMessageToGateway = function(message, firstEntryRelayNodeID) {
   var self = this;
   this.socketClient.forEach(function(element) {
-    if (element.type == 'Gateway') {
+    if (element.type == 'Gateway' && element.id == firstEntryRelayNodeID) {
       var result = element.address.split(':');
       var host = result[0];
       var port = result[1];
@@ -726,7 +741,7 @@ Node.prototype.addSessionToValidationSystem = function(receiver, packetArray) {
 
             sendCounter++;
             var message = Buffer.from(JSON.stringify(packetArray[sendCounter]));
-            self.sendMessageToExitRelayNodes(message);
+            self.sendMessageToExitRelayNode(message);
           }).catch(function(err) {
             console.log(err);
           });
