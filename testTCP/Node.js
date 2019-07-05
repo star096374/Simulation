@@ -175,8 +175,28 @@ function Node(options) {
                     console.log(err);
                   });
 
+                  var triggerDecideCheckerOfPoBTimer;
+                  if (message.sequenceNumber == 0) {
+                    triggerDecideCheckerOfPoBTimer = setTimeout(function() {
+                      console.log("[%s] Decide the checker of proof of bandwidth", self.id);
+                      self.validationSystem.decideCheckerOfPoB(message.sessionID, {from: self.ethereumAccount, gas: 1000000}).then(function() {
+                        self.validationSystem.getSessionInformation(message.sessionID, 0, {from: self.ethereumAccount}).then(function(result) {
+                          console.log("[%s] -----Data from Validation System-----", self.id);
+                          console.log("[%s] Session ID: %d", self.id, result[0].toNumber());
+                          console.log("[%s] PoBChecker address: %s", self.id, result[7].toString());
+                          console.log("[%s] -----Data End-----", self.id);
+                        }).catch(function(err) {
+                          console.log(err);
+                        });
+                      }).catch(function(err) {
+                        console.log(err);
+                      });
+                    }, 25000);
+                  }
+
                   if (self.uploadedPathTokenNumber[message.sessionID] == message.theNumberOfPackets && self.isPoBCheckerDecided[message.sessionID] == false) {
                     self.isPoBCheckerDecided[message.sessionID] = true;
+                    clearTimeout(triggerDecideCheckerOfPoBTimer);
                     setTimeout(function() {
                       console.log("[%s] Decide the checker of proof of bandwidth", self.id);
                       self.validationSystem.decideCheckerOfPoB(message.sessionID, {from: self.ethereumAccount, gas: 1000000}).then(function() {
@@ -404,8 +424,28 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
                   console.log(err);
                 });
 
+                var triggerDecideCheckerOfPoBTimer;
+                if (message.sequenceNumber == 0) {
+                  triggerDecideCheckerOfPoBTimer = setTimeout(function() {
+                    console.log("[%s] Decide the checker of proof of bandwidth", self.id);
+                    self.validationSystem.decideCheckerOfPoB(message.sessionID, {from: self.ethereumAccount, gas: 1000000}).then(function() {
+                      self.validationSystem.getSessionInformation(message.sessionID, 0, {from: self.ethereumAccount}).then(function(result) {
+                        console.log("[%s] -----Data from Validation System-----", self.id);
+                        console.log("[%s] Session ID: %d", self.id, result[0].toNumber());
+                        console.log("[%s] PoBChecker address: %s", self.id, result[7].toString());
+                        console.log("[%s] -----Data End-----", self.id);
+                      }).catch(function(err) {
+                        console.log(err);
+                      });
+                    }).catch(function(err) {
+                      console.log(err);
+                    });
+                  }, 25000);
+                }
+
                 if (self.uploadedPathTokenNumber[message.sessionID] == message.theNumberOfPackets && self.isPoBCheckerDecided[message.sessionID] == false) {
                   self.isPoBCheckerDecided[message.sessionID] = true;
+                  clearTimeout(triggerDecideCheckerOfPoBTimer);
                   setTimeout(function() {
                     console.log("[%s] Decide the checker of proof of bandwidth", self.id);
                     self.validationSystem.decideCheckerOfPoB(message.sessionID, {from: self.ethereumAccount, gas: 1000000}).then(function() {
@@ -588,8 +628,28 @@ Node.prototype._sendMessage = function(type, host, port, message) {
               console.log(err);
             });
 
+            var triggerDecideCheckerOfPoBTimer;
+            if (parsedMessage.sequenceNumber == 0) {
+              triggerDecideCheckerOfPoBTimer = setTimeout(function() {
+                console.log("[%s] Decide the checker of proof of bandwidth", self.id);
+                self.validationSystem.decideCheckerOfPoB(parsedMessage.sessionID, {from: self.ethereumAccount, gas: 1000000}).then(function() {
+                  self.validationSystem.getSessionInformation(parsedMessage.sessionID, 0, {from: self.ethereumAccount}).then(function(result) {
+                    console.log("[%s] -----Data from Validation System-----", self.id);
+                    console.log("[%s] Session ID: %d", self.id, result[0].toNumber());
+                    console.log("[%s] PoBChecker address: %s", self.id, result[7].toString());
+                    console.log("[%s] -----Data End-----", self.id);
+                  }).catch(function(err) {
+                    console.log(err);
+                  });
+                }).catch(function(err) {
+                  console.log(err);
+                });
+              }, 25000);
+            }
+
             if (self.uploadedPathTokenNumber[parsedMessage.sessionID] == parsedMessage.theNumberOfPackets && self.isPoBCheckerDecided[parsedMessage.sessionID] == false) {
               self.isPoBCheckerDecided[parsedMessage.sessionID] = true;
+              clearTimeout(triggerDecideCheckerOfPoBTimer);
               setTimeout(function() {
                 console.log("[%s] Decide the checker of proof of bandwidth", self.id);
                 self.validationSystem.decideCheckerOfPoB(parsedMessage.sessionID, {from: self.ethereumAccount, gas: 1000000}).then(function() {
