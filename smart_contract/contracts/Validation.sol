@@ -41,6 +41,7 @@ contract Validation {
     address sender;
     string senderID;
     bool isPathTokenInvalid;
+    bool isPoBCheckerDecided;
   }
 
   struct Data {
@@ -80,7 +81,7 @@ contract Validation {
   }
 
   function addSession(uint256 sessionID, address receiver, uint256 packetLength, uint256 sequenceNumber, uint256 theNumberOfPackets, string senderID) public {
-    SessionArray.push(Session(sessionID, receiver, "", packetLength, "", false, false, false, "", false, "", 0, sequenceNumber, theNumberOfPackets, msg.sender, senderID, false));
+    SessionArray.push(Session(sessionID, receiver, "", packetLength, "", false, false, false, "", false, "", 0, sequenceNumber, theNumberOfPackets, msg.sender, senderID, false, false));
   }
 
   function uploadData(uint256 sessionID, string fromNodeID, string hashValue, uint256 sequenceNumber) public {
@@ -187,6 +188,15 @@ contract Validation {
   }
 
   function decideCheckerOfPoB(uint256 _sessionID) public {
+    for (uint256 l = 0; l < SessionArray.length; l++) {
+      if (SessionArray[l].id == _sessionID) {
+        if (SessionArray[l].isPoBCheckerDecided == true) {
+          return;
+        }
+        break;
+      }
+    }
+
     uint256 theNumberOfCompetitor = 0;
     uint256 totalRandomNumber = 0;
     for (uint256 i = 0; i < PoBArray.length; i++) {
@@ -215,6 +225,7 @@ contract Validation {
     for (uint256 k = 0; k < SessionArray.length; k++) {
       if (SessionArray[k].id == _sessionID) {
         SessionArray[k].PoBChecker = _PoBWinnerAddress;
+        SessionArray[k].isPoBCheckerDecided = true;
         _theNumberOfPackets++;
       }
     }

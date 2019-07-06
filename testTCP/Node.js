@@ -838,7 +838,7 @@ Node.prototype.addSessionToValidationSystem = function(receiver, packetArray) {
             console.log(err);
           });
         }, 10000);
-      }, 60000);
+      }, 30000);
 
       self.isPoBTriggered.push({
         sessionID: sessionID,
