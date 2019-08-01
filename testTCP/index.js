@@ -39,12 +39,12 @@ Validation.setProvider(web3.currentProvider);
 Reputation.setProvider(web3.currentProvider);
 Payment.setProvider(web3.currentProvider);
 
-var nodeID = ['node0', 'node1', 'node2', 'node3', 'node4', 'node5'];
-var nodePort = [3000, 4000, 5000, 6000, 7000, 8000];
+var nodeID = ['node0', 'node1', 'node2', 'node3', 'node4', 'node5', 'node6', 'node7'];
+var nodePort = [3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000];
 var nodeList = [];
 
 var checkerID = ['checker0', 'checker1'];
-var checkerPort = [9000, 10000];
+var checkerPort = [11000, 12000];
 var checkerList = [];
 
 var startTime = 10000;
@@ -61,7 +61,7 @@ web3.eth.getAccounts(function(err, accs) {
     process.exit(1);
   }
 
-  for (var i = 0; i < 6; i++) {
+  for (var i = 0; i < nodeID.length; i++) {
     nodeList.push(new Node({
       id: nodeID[i],
       port: nodePort[i],
@@ -73,7 +73,7 @@ web3.eth.getAccounts(function(err, accs) {
     }));
   }
 
-  for (var i = 0; i < 2; i++) {
+  for (var i = 0; i < checkerID.length; i++) {
     checkerList.push(new Node({
       id: checkerID[i],
       port: checkerPort[i],
@@ -90,25 +90,33 @@ web3.eth.getAccounts(function(err, accs) {
 });
 
 // random session ID
-var sessionID = Math.floor(Math.random() * 10000);
+var sessionID = Math.floor(Math.random() * 9000) + 1000;
 
 // store all the packets
 var packetArray = [];
 var theNumberOfPackets = 5;
+var payloadString = "a";
+var totalPacketLength = 0;
 
 for (var i = 0; i < theNumberOfPackets; i++) {
   var packet = {
     sessionID: sessionID,
     sender: 'node0',
-    receiver: 'node5',
-    entryPathFilter: ['node3', 'node4', 'node5'],
+    receiver: 'node7',
+    entryPathFilter: ['node7'],
     pathToken: ['node0'],
-    payload: "test message" + i,
+    payload: payloadString.repeat(1000),
     sequenceNumber: i,
     theNumberOfPackets: theNumberOfPackets
   }
   packetArray.push(packet);
+  totalPacketLength += JSON.stringify(packet).length;
 }
+console.log("-----Experiment Arguments-----");
+console.log("payloadLength: %d", packetArray[0].payload.length);
+console.log("theNumberOfPackets: %d", theNumberOfPackets);
+console.log("totalPacketLength: %d", totalPacketLength);
+console.log("-----Experiment Arguments End-----");
 
 setTimeout(function() {
   console.log("*After %d secs*", startTime / 1000);
@@ -130,11 +138,24 @@ setTimeout(function() {
 }, simulationEndTime);
 
 function createTopology() {
-  nodeList[0].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[1]);
+  /*nodeList[0].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[1]);
   nodeList[1].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[2]);
   nodeList[2].connectToAnotherServer('Gateway', '127.0.0.1', nodePort[3]);
   nodeList[4].connectToAnotherServer('Entry Relay', '127.0.0.1', nodePort[3]);
-  nodeList[5].connectToAnotherServer('Entry Relay', '127.0.0.1', nodePort[4]);
+  nodeList[5].connectToAnotherServer('Entry Relay', '127.0.0.1', nodePort[4]);*/
+
+  nodeList[0].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[1]);
+  nodeList[0].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[2]);
+  nodeList[0].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[3]);
+  nodeList[1].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[4]);
+  nodeList[1].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[5]);
+  nodeList[2].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[5]);
+  nodeList[2].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[6]);
+  nodeList[3].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[4]);
+  nodeList[3].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[6]);
+  nodeList[4].connectToAnotherServer('Gateway', '127.0.0.1', nodePort[7]);
+  nodeList[5].connectToAnotherServer('Gateway', '127.0.0.1', nodePort[7]);
+  nodeList[6].connectToAnotherServer('Gateway', '127.0.0.1', nodePort[7]);
 }
 
 function checkReputationScore() {
@@ -154,8 +175,18 @@ function checkReputationScore() {
 }
 
 function initRelayContractRelationship() {
-  nodeList[0].setRelayContract(nodeID[1], 'Exit Relay', 2000, 100, 10);
-  nodeList[1].setRelayContract(nodeID[2], 'Exit Relay', 2000, 100, 10);
-  nodeList[4].setRelayContract(nodeID[3], 'Entry Relay', 2000, 100, 10);
-  nodeList[5].setRelayContract(nodeID[4], 'Entry Relay', 2000, 100, 10);
+  /*nodeList[0].setRelayContract(nodeID[1], 'Exit Relay', 20000, 100, 10);
+  nodeList[1].setRelayContract(nodeID[2], 'Exit Relay', 20000, 100, 10);
+  nodeList[4].setRelayContract(nodeID[3], 'Entry Relay', 20000, 100, 10);
+  nodeList[5].setRelayContract(nodeID[4], 'Entry Relay', 20000, 100, 10);*/
+
+  nodeList[0].setRelayContract(nodeID[1], 'Exit Relay', 20000, 100, 10);
+  nodeList[0].setRelayContract(nodeID[2], 'Exit Relay', 20000, 100, 10);
+  nodeList[0].setRelayContract(nodeID[3], 'Exit Relay', 20000, 100, 10);
+  nodeList[1].setRelayContract(nodeID[4], 'Exit Relay', 20000, 100, 10);
+  nodeList[1].setRelayContract(nodeID[5], 'Exit Relay', 20000, 100, 10);
+  nodeList[2].setRelayContract(nodeID[5], 'Exit Relay', 20000, 100, 10);
+  nodeList[2].setRelayContract(nodeID[6], 'Exit Relay', 20000, 100, 10);
+  nodeList[3].setRelayContract(nodeID[4], 'Exit Relay', 20000, 100, 10);
+  nodeList[3].setRelayContract(nodeID[6], 'Exit Relay', 20000, 100, 10);
 }

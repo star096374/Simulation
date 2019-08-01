@@ -104,6 +104,9 @@ function Node(options) {
   // store the status of relay contract
   this.relayContractStatus = [];
 
+  // PoB accuracy experiment
+  self.isPacketDroped = [];
+
   this.server = net.createServer(function(socket) {
     // if someone connect to this server, this function will be triggered
     console.log("[%s] A client %s:%d connect to the server", self.id, socket.remoteAddress, socket.remotePort);
@@ -131,6 +134,38 @@ function Node(options) {
             return;
           }
           else {
+            // PoB accuracy experiment
+            if (self.id == 'node4' || self.id == 'node5' || self.id == 'node6') {
+              var isPacketDropedIndex = self.isPacketDroped.map(function(element) {
+                return element.sessionID + ',' + element.sequenceNumber;
+              }).indexOf(message.sessionID + ',' + message.sequenceNumber);
+              if (isPacketDropedIndex == -1) {
+                var randomNumber = Math.floor(Math.random() * 4);
+                if (randomNumber == 0) {
+                  console.log("*[%s] Drop the packet, session ID: %d, sequence number: %d*", self.id, message.sessionID, message.sequenceNumber);
+                  self.isPacketDroped.push({
+                    sessionID: message.sessionID,
+                    sequenceNumber: message.sequenceNumber,
+                    dropOrNot: true
+                  });
+                  return;
+                }
+                else {
+                  self.isPacketDroped.push({
+                    sessionID: message.sessionID,
+                    sequenceNumber: message.sequenceNumber,
+                    dropOrNot: false
+                  });
+                }
+              }
+              else {
+                if (self.isPacketDroped[isPacketDropedIndex].dropOrNot == true) {
+                  console.log("*[%s] Drop the packet, session ID: %d, sequence number: %d*", self.id, message.sessionID, message.sequenceNumber);
+                  return;
+                }
+              }
+            }
+
             self.receivedPacket.push(message.sessionID + ',' + message.sequenceNumber);
             // send ack to sender
             socket.write(message.sessionID + ',' + message.sequenceNumber + '\n');
@@ -171,7 +206,7 @@ function Node(options) {
 
                 setTimeout(function() {
                   console.log("[%s] Set checkable of the session true", self.id);
-                  self.validationSystem.setSessionCheckable(message.sessionID, message.sequenceNumber, {from: self.ethereumAccount}).catch(function(err) {
+                  self.validationSystem.setSessionCheckable(message.sessionID, message.sequenceNumber, {from: self.ethereumAccount, gas: 1000000}).catch(function(err) {
                     console.log(err);
                   });
 
@@ -274,7 +309,18 @@ function Node(options) {
                 else if (gatewayNumber > 0) {
                   console.log("[%s] Forward message to gateway", self.id);
                   var firstEntryRelayNodeID = message.entryPathFilter.toString().split(',')[0];
-                  self.sendMessageToGateway(messageWithNewPathToken, firstEntryRelayNodeID);
+                  var isMessageForwarded = false;
+                  var forEachCounter = 0;
+                  self.socketClient.forEach(function(item) {
+                    if (item.type == 'Gateway' && item.id == firstEntryRelayNodeID) {
+                      isMessageForwarded = true;
+                      self.sendMessageToGateway(messageWithNewPathToken, firstEntryRelayNodeID);
+                    }
+                    forEachCounter++;
+                    if (forEachCounter == self.socketClient.length && isMessageForwarded == false) {
+                      console.log("[%s] Message is not forwarded", self.id);
+                    }
+                  });
                 }
                 else {
                   var newEntryPathFilter = message.entryPathFilter.toString().split(',');
@@ -294,9 +340,16 @@ function Node(options) {
                   }
                   var newMessage = Buffer.from(JSON.stringify(newPacket));
 
+                  var isMessageForwarded = false;
+                  var forEachCounter = 0;
                   self.socketServer.forEach(function(item) {
                     if (item.type == 'Entry Relay' && item.id == nextNodeID) {
+                      isMessageForwarded = true;
                       self.sendMessageToEntryRelayNode(nextNodeID, newMessage);
+                    }
+                    forEachCounter++;
+                    if (forEachCounter == self.socketServer.length && isMessageForwarded == false) {
+                      console.log("[%s] Message is not forwarded", self.id);
                     }
                   });
                 }
@@ -420,7 +473,7 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
 
               setTimeout(function() {
                 console.log("[%s] Set checkable of the session true", self.id);
-                self.validationSystem.setSessionCheckable(message.sessionID, message.sequenceNumber, {from: self.ethereumAccount}).catch(function(err) {
+                self.validationSystem.setSessionCheckable(message.sessionID, message.sequenceNumber, {from: self.ethereumAccount, gas: 1000000}).catch(function(err) {
                   console.log(err);
                 });
 
@@ -506,9 +559,17 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
               console.log("[%s] -----Data End-----", self.id);
 
               console.log("[%s] Forward message to the entry relay node %s", self.id, nextNodeID);
+
+              var isMessageForwarded = false;
+              var forEachCounter = 0;
               self.socketServer.forEach(function(item) {
                 if (item.type == 'Entry Relay' && item.id == nextNodeID) {
+                  isMessageForwarded = true;
                   self.sendMessageToEntryRelayNode(nextNodeID, newMessage);
+                }
+                forEachCounter++;
+                if (forEachCounter == self.socketServer.length && isMessageForwarded == false) {
+                  console.log("[%s] Message is not forwarded", self.id);
                 }
               });
             }).catch(function(err) {
@@ -526,7 +587,7 @@ Node.prototype.connectToAnotherServer = function(type, host, port) {
           var index = self.socketClient.map(function(t) {
             return t.socket;
           }).indexOf(socket);
-          self.socketClient[index].id = element;
+          self.socketClient[index].id = element.toString();
         }
         else {
           // receive ack, element = session ID, sequence number
@@ -624,7 +685,7 @@ Node.prototype._sendMessage = function(type, host, port, message) {
 
           setTimeout(function() {
             console.log("[%s] Set checkable of the session true", self.id);
-            self.validationSystem.setSessionCheckable(parsedMessage.sessionID, parsedMessage.sequenceNumber, {from: self.ethereumAccount}).catch(function(err) {
+            self.validationSystem.setSessionCheckable(parsedMessage.sessionID, parsedMessage.sequenceNumber, {from: self.ethereumAccount, gas: 1000000}).catch(function(err) {
               console.log(err);
             });
 
@@ -819,7 +880,7 @@ Node.prototype.addSessionToValidationSystem = function(receiver, packetArray) {
       var triggerPoBTimer = setTimeout(function() {
         console.log("[%s] Trigger proof of bandwidth, sessionID: %d", self.id, sessionID);
         for (var j = 0; j < theNumberOfPackets; j++) {
-          self.validationSystem.setSessionCheckable(sessionID, j, {from: self.ethereumAccount}).catch(function(err) {
+          self.validationSystem.setSessionCheckable(sessionID, j, {from: self.ethereumAccount, gas: 1000000}).catch(function(err) {
             console.log(err);
           });
         }
@@ -838,7 +899,7 @@ Node.prototype.addSessionToValidationSystem = function(receiver, packetArray) {
             console.log(err);
           });
         }, 10000);
-      }, 30000);
+      }, 150000);
 
       self.isPoBTriggered.push({
         sessionID: sessionID,
@@ -985,6 +1046,8 @@ Node.prototype._addWinPoBCompetitionListener = function(winPoBCompetition) {
 
 Node.prototype.getDataForProofOfBandwidth = function(sessionID, theNumberOfPackets) {
   var self = this;
+  this.PoBStartTime = Date.now();
+  console.log("*[%s] PoB start time: %d*", this.id, this.PoBStartTime);
   console.log("[%s] Get data for proof of bandwidth", this.id);
 
   for (var i = 0; i < theNumberOfPackets; i++) {
@@ -1144,6 +1207,9 @@ Node.prototype._doProofOfBandwidth = function(sessionID, theNumberOfPackets, ses
 
           getReputationCounter++;
           if (getReputationCounter == theNumberOfPackets) {
+            self.PoBEndTime = Date.now();
+            console.log("*[%s] PoB end time: %d*", self.id, self.PoBEndTime);
+            console.log("*[%s] Time used to do PoB: %d (ms)*", self.id, (self.PoBEndTime-self.PoBStartTime));
             self.reputationSystem.getReputationScore({from: self.ethereumAccount}).then(function(result) {
               console.log("[%s] Get reputation score from Reputation System", self.id);
               console.log("[%s] -----Data from Reputation System-----", self.id);
@@ -1182,6 +1248,9 @@ Node.prototype._doProofOfBandwidth = function(sessionID, theNumberOfPackets, ses
 
         getReputationCounter++;
         if (getReputationCounter == theNumberOfPackets) {
+          self.PoBEndTime = Date.now();
+          console.log("*[%s] PoB end time: %d*", self.id, self.PoBEndTime);
+          console.log("*[%s] Time used to do PoB: %d (ms)*", self.id, (self.PoBEndTime-self.PoBStartTime));
           self.reputationSystem.getReputationScore({from: self.ethereumAccount}).then(function(result) {
             console.log("[%s] Get reputation score from Reputation System", self.id);
             console.log("[%s] -----Data from Reputation System-----", self.id);

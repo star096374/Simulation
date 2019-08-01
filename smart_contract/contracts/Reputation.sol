@@ -10,7 +10,7 @@ contract Reputation {
   // node id => ethereum address
   mapping (string => address) addressList;
 
-  int256 scoreUnit = 5;
+  int256 scoreUnit = 1;
   // because split() will push the result to the storage ref, you have to remember the original length
   uint256 lengthOfPathTokenList = 0;
 
@@ -21,8 +21,8 @@ contract Reputation {
 
   mapping (address => mapping (address => transactionStatus)) reputationStatus;
 
-  int256 maxAddedScore = 10000;
-  uint256 resetDuration = 60;
+  int256 maxAddedScore = 1000000;
+  uint256 resetDuration = 600;
 
   constructor() public {
 
