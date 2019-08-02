@@ -146,14 +146,14 @@ function createTopology() {
 
   nodeList[0].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[1]);
   nodeList[0].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[2]);
-  nodeList[0].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[3]);
+  nodeList[1].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[3]);
   nodeList[1].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[4]);
-  nodeList[1].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[5]);
-  nodeList[2].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[5]);
-  nodeList[2].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[6]);
-  nodeList[3].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[4]);
+  nodeList[2].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[3]);
+  nodeList[2].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[4]);
+  nodeList[3].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[5]);
   nodeList[3].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[6]);
-  nodeList[4].connectToAnotherServer('Gateway', '127.0.0.1', nodePort[7]);
+  nodeList[4].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[5]);
+  nodeList[4].connectToAnotherServer('Exit Relay', '127.0.0.1', nodePort[6]);
   nodeList[5].connectToAnotherServer('Gateway', '127.0.0.1', nodePort[7]);
   nodeList[6].connectToAnotherServer('Gateway', '127.0.0.1', nodePort[7]);
 }
@@ -182,11 +182,12 @@ function initRelayContractRelationship() {
 
   nodeList[0].setRelayContract(nodeID[1], 'Exit Relay', 20000, 100, 10);
   nodeList[0].setRelayContract(nodeID[2], 'Exit Relay', 20000, 100, 10);
-  nodeList[0].setRelayContract(nodeID[3], 'Exit Relay', 20000, 100, 10);
+  nodeList[1].setRelayContract(nodeID[3], 'Exit Relay', 20000, 100, 10);
   nodeList[1].setRelayContract(nodeID[4], 'Exit Relay', 20000, 100, 10);
-  nodeList[1].setRelayContract(nodeID[5], 'Exit Relay', 20000, 100, 10);
-  nodeList[2].setRelayContract(nodeID[5], 'Exit Relay', 20000, 100, 10);
-  nodeList[2].setRelayContract(nodeID[6], 'Exit Relay', 20000, 100, 10);
-  nodeList[3].setRelayContract(nodeID[4], 'Exit Relay', 20000, 100, 10);
+  nodeList[2].setRelayContract(nodeID[3], 'Exit Relay', 20000, 100, 10);
+  nodeList[2].setRelayContract(nodeID[4], 'Exit Relay', 20000, 100, 10);
+  nodeList[3].setRelayContract(nodeID[5], 'Exit Relay', 20000, 100, 10);
   nodeList[3].setRelayContract(nodeID[6], 'Exit Relay', 20000, 100, 10);
+  nodeList[4].setRelayContract(nodeID[5], 'Exit Relay', 20000, 100, 10);
+  nodeList[4].setRelayContract(nodeID[6], 'Exit Relay', 20000, 100, 10);
 }

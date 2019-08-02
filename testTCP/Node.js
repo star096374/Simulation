@@ -135,7 +135,7 @@ function Node(options) {
           }
           else {
             // PoB accuracy experiment
-            if (self.id == 'node4' || self.id == 'node5' || self.id == 'node6') {
+            if (self.id == 'node2' || self.id == 'node4' || self.id == 'node6') {
               var isPacketDropedIndex = self.isPacketDroped.map(function(element) {
                 return element.sessionID + ',' + element.sequenceNumber;
               }).indexOf(message.sessionID + ',' + message.sequenceNumber);
